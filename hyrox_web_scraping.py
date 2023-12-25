@@ -1,5 +1,8 @@
 # import 
+from nis import cat
 from operator import le
+from black import out
+from exceptiongroup import catch
 import seaborn
 import scipy
 from requests import request
@@ -220,13 +223,17 @@ class HyroxEvent:
                         age_field = fields[3]
                         time_field = fields[6]
                     else:
-                        id_field = fields[3 + country_col]
-                        name_field = fields[2]
-                        age_field = fields[4 + country_col]
-                        time_field = fields[7 + country_col]
-
-                    id = removeprefix(id_field.text.strip(), "Number") if id_field is not None else ""
+                        # adding a count higher than 6, there are cases where the race results page looks very different, and the below extractions would fail
+                        if len(fields) > 6:
+                            id_field = fields[3 + country_col]
+                            name_field = fields[2]
+                            age_field = fields[4 + country_col]
+                            time_field = fields[7 + country_col]
+                            
+                        id = removeprefix(id_field.text.strip(), "Number") if id_field is not None else ""
                     name = name_field.text.strip()
+
+
                     link = f"https://hyrox.r.mikatiming.de/season-{self.season}/{name_field.a.get('href')}"
                     age_group = removeprefix(age_field.text.strip(), "Age Group")
                     time = removeprefix(time_field.text.strip(), "Total")
@@ -280,9 +287,13 @@ class HyroxEvent:
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
         df.drop(["id", "name"], axis=1, inplace=True)
         
-        df.to_csv(f"/kaggle/working/{self.event_name}.csv", index=False)
+        outdir = './hryoxData'
+        if not os.path.exists(outdir):
+            os.mkdir(outdir)
+        df.to_csv(f"{outdir}/{self.event_name}.csv", index=False)
 
 
 s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
 laInfo = s5_losAngeles2022.get_info()
+s5_losAngeles2022.save()
 break_value = 0
