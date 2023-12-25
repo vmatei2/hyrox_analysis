@@ -1,4 +1,3 @@
-# import 
 from nis import cat
 from operator import le
 from black import out
@@ -293,7 +292,71 @@ class HyroxEvent:
         df.to_csv(f"{outdir}/{self.event_name}.csv", index=False)
 
 
-s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
-laInfo = s5_losAngeles2022.get_info()
-s5_losAngeles2022.save()
+# example of retrieving data
+# s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
+# laInfo = s5_losAngeles2022.get_info()
+# s5_losAngeles2022.save()
+
+
+s5_london2023 = HyroxEvent(event_id="JGDMS4JI47A", season=5)
+s5_hongkong2023 = HyroxEvent(event_id="JGDMS4JI46F", season=5)
+s5_dallas2023 = HyroxEvent(event_id="JGDMS4JI470", season=5)
+s5_barcelona2023 = HyroxEvent(event_id="JGDMS4JI466", season=5)
+s5_hamburg2023 = HyroxEvent(event_id="JGDMS4JI473", season=5)
+s5_munchen2023 = HyroxEvent(event_id="JGDMS4JI464", season=5)
+s5_manchesterWorldChamps2023 = HyroxEvent(event_id="2EFMS4JI335", season=5)
+s5_rotterdam2023 = HyroxEvent(event_id="JGDMS4JI46E", season=5)
+s5_hannover2023 = HyroxEvent(event_id="JGDMS4JI46C", season=5)
+s5_anaheim2923 = HyroxEvent(event_id="JGDMS4JI472", season=5)
+s5_koln2023 = HyroxEvent(event_id="JGDMS4JI468", season=5)
+s5_malaga2023 = HyroxEvent(event_id="JGDMS4JI46A", season=5)
+s5_miami2023 = HyroxEvent(event_id="JGDMS4JI474", season=5)
+s5_karlsruhe2023 = HyroxEvent(event_id="JGDMS4JI465", season=5)
+s5_wien2023 = HyroxEvent(event_id="JGDMS4JI461", season=5)
+s5_houston2023 = HyroxEvent(event_id="JGDMS4JI462", season=5)
+s5_glasgow2023 = HyroxEvent(event_id="JGDMS4JI439", season=5)
+s5_chichago_americanChamps = HyroxEvent(event_id="JGDMS4JI44E", season=5)
+s5_bilbao2023 = HyroxEvent(event_id="JGDMS4JI44F", season=5)
+s5_stuttgart2023 = HyroxEvent(event_id="JGDMS4JI44D", season=5)
+s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5)
+s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5)
+
+# store elements in the list for easier manipulation
+events_list = [
+    s5_london2023,
+    s5_hongkong2023,
+    s5_dallas2023,
+    s5_barcelona2023,
+    s5_hamburg2023,
+    s5_munchen2023,
+    s5_manchesterWorldChamps2023,
+    s5_rotterdam2023,
+    s5_hannover2023,
+    s5_anaheim2923,
+    s5_koln2023,
+    s5_malaga2023,
+    s5_miami2023,
+    s5_karlsruhe2023,
+    s5_wien2023,
+    s5_houston2023,
+    s5_glasgow2023,
+    s5_chichago_americanChamps,
+    s5_bilbao2023,
+    s5_stuttgart2023,
+    s5_manchester2023,
+    s5_euroChamps2023
+]
+
+for event in events_list:
+    # try catch in case issue with any event, make sure we are still saving all data for events without problems
+    try:
+        event.get_info()
+        event.save()
+    except Exception as e:
+        print("have caught the following error: ", e)
+
+
+
+
+
 break_value = 0
