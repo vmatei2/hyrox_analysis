@@ -182,6 +182,7 @@ class HyroxEvent:
     def get_info(self):
 
         combinations = list(itertools.product(Division, Gender))
+        print("Getting event information for ", self.event_name)
         pbar = tqdm(combinations, desc="Retrieving participants")
         for division, gender in pbar:
             page = 1
@@ -359,4 +360,3 @@ for event in events_list:
 
 
 
-break_value = 0
