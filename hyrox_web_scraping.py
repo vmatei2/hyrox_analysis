@@ -1,21 +1,13 @@
-from nis import cat
-from operator import le
-from black import out
-from exceptiongroup import catch
-import seaborn
-import scipy
 from requests import request
 from bs4 import BeautifulSoup
 from enum import Enum
 import re
 import itertools
-from sympy import pretty
 from tqdm import tqdm
 from datetime import timedelta
 import numpy as np
 import pandas as pd
 import os
-from typing import Optional
 
 ## helper classes
 class Division(Enum):
@@ -31,6 +23,8 @@ class Division(Enum):
 class Gender(Enum):
     male = "M"
     female = "W"
+    mixed = "X"
+
 
 
 ## Helper Functions
@@ -297,7 +291,14 @@ class HyroxEvent:
 # s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
 # laInfo = s5_losAngeles2022.get_info()
 # s5_losAngeles2022.save()
-
+def save_events(events):
+    for event in events:
+    # try catch in case issue with any event, make sure we are still saving all data for events without problems
+        try:
+            event.get_info()
+            event.save()
+        except Exception as e:
+            print("have caught the following error: ", e)
 
 s5_london2023 = HyroxEvent(event_id="JGDMS4JI47A", season=5)
 s5_hongkong2023 = HyroxEvent(event_id="JGDMS4JI46F", season=5)
@@ -347,14 +348,9 @@ events_list = [
     s5_manchester2023,
     s5_euroChamps2023
 ]
+save_events([s5_barcelona2023])
 
-for event in events_list:
-    # try catch in case issue with any event, make sure we are still saving all data for events without problems
-    try:
-        event.get_info()
-        event.save()
-    except Exception as e:
-        print("have caught the following error: ", e)
+# save_events(events_list)
 
 
 
