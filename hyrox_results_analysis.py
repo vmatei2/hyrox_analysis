@@ -62,10 +62,6 @@ def extract_averages(df):
     :param df:
     :return:
     """
-
-
-
-
     mean_values_run = [df[col].mean() for col in RUN_LABELS]
     mean_values_station = [df[col].mean() for col in WORK_LABELS]
     mean_values_roxzone = [df[col].mean() for col in ROXZONE_LABELS]
@@ -176,11 +172,18 @@ def linear_regression_model(df):
     plt.show()
 
 
-
+def analyse_all_races():
+    # get the data
+    all_races = load()
+    all_races = pd.concat(all_races, ignore_index=True)
+    return  all_races
 
 sns.set_style('darkgrid')
 london2023 = load_one_file("hyroxData/S5 2023 London.csv")
 types = london2023.dtypes
 barca_entry_male_open = get_division_entry(london2023, 'male', 'open')
+all_races = analyse_all_races()
 
-analyse_race_under_seventy(barca_entry_male_open)
+
+
+analyse_race_under_seventy(all_races)
