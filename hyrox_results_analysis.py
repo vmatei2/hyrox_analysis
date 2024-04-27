@@ -9,6 +9,11 @@ from sklearn.model_selection import train_test_split
 from sklearn import svm
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.tree import plot_tree
+import pickle
+
 
 #  Global variables to be used for run and work/station labels throughout this analysis file!
 
@@ -179,14 +184,51 @@ def line_plot_runs(df):
     plt.legend()
     plt.show()
 
-def linear_regression_model(df):
-    # CREATE THE X (predictors) and y (target)
+def random_forest_classifier(df):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
+    rf = RandomForestClassifier(random_state=42)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=99)
-    model = LogisticRegression()
-    model.fit(X_train, y_train)
+    params = {
+        'max_depth': [2,5,20],
+        'min_samples_leaf': [5,20,100],
+        'n_estimators': [10,25,50]
+    }
+    # Instantiate the grid search model
+    grid_search = GridSearchCV(estimator=rf, param_grid=params, cv=3, verbose=1, scoring="accuracy")
+    grid_search.fit(X_train, y_train)
+    print(f"Best score found through grid search was {grid_search.best_score_}")
+    rf_classifier = grid_search.best_estimator_
+
+    filename = 'rf_classifier.sav'
+    pickle.dump(rf_classifier, open(filename, 'wb'))
+    plt.figure(figsize=(10, 10))
+    plot_tree(rf_classifier.estimators_[5], feature_names=X.columns, class_names=list(y.unique()))
+    plt.show()
+
+
+def analyse_rf_classifier(df):
+    X = df[RUN_LABELS + WORK_LABELS]
+    y = df['Top Percentage']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
+    rf_classifier = pickle.load(open("rf_classifier.sav", 'rb'))
+    result = rf_classifier.score(X_test, y_test)
+    print(result)
+
+    feature_names = RUN_LABELS + STATIONS
+    importances = pd.Series(rf_classifier.feature_importances_, index=feature_names)
+    importances_sorted = importances.sort_values(ascending=False)
+
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x=importances_sorted.values, y=importances_sorted.index, palette='viridis')
+
+    plt.xlabel("Importance")
+    plt.ylabel("Feature")
+    plt.title("Feature Importance")
+
+    plt.show()
+
 
 def svm_model(df):
     clf = svm.SVC(kernel='linear')
@@ -237,8 +279,8 @@ all_races = analyse_all_races()
 all_male_open = get_division_entry(all_races, 'male', 'open')
 # analyse_race(all_male_open)
 
-linear_regression_model(all_male_open)
-
+# random_forest_classifier(all_male_open)
+analyse_rf_classifier(all_male_open)
 
 # london2023 = load_one_file("hyroxData/S5 2023 London.csv")
 # london_male_open = get_division_entry(london2023, 'male', 'open')
