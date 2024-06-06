@@ -47,6 +47,7 @@ def load_one_file(path):
     # pre-processing part
     for col in RUN_LABELS + WORK_LABELS + ROXZONE_LABELS + ["total_time"]:
         df[col] = pd.to_timedelta(df[col])
+        # convert to minutes
         df[col] = df[col].dt.total_seconds() / 60.0
     # create top x% column
     total_athletes = len(df)
@@ -78,8 +79,6 @@ def analyse_race(df):
     plot_data_points(df, WORK_LABELS, 'Station analysis for Male Open', 'Stations',
                      ['SkiErg', 'SledPush', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry',
                       'Sandbag Lunges', 'Wall Balls'])
-
-    linear_regression_model(df)
 
 def extract_averages(df):
     """
@@ -208,11 +207,10 @@ def random_forest_classifier(df):
     plt.show()
 
 
-def analyse_rf_classifier(df):
+def analyse_rf_classifier(df, rf_classifier):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
-    rf_classifier = pickle.load(open("rf_classifier.sav", 'rb'))
     result = rf_classifier.score(X_test, y_test)
     print(result)
 
@@ -229,6 +227,27 @@ def analyse_rf_classifier(df):
 
     plt.show()
 
+def predict_my_race(rf_model, run_station_times):
+    run_station_times = convert_string_times_to_model_inputs(run_station_times)
+    run_station_times = np.array(run_station_times)
+    prediction = rf_model.predict(run_station_times.reshape(1, -1))
+    print(f"Your predicted percentile result given your run and station times is: {prediction}")
+
+    return prediction
+
+
+def convert_string_times_to_model_inputs(times):
+    """
+    Function to convert the times as a list of strings to a list of values the model expects (i.e 4mins30s = 4.5)
+    :param times:
+    :return:
+    """
+    float_list = []
+    for time_str in times:
+        minutes, seconds = map(float, time_str.split(":"))
+        total_minutes = minutes + seconds / 60
+        float_list.append(total_minutes)
+    return float_list
 
 def svm_model(df):
     clf = svm.SVC(kernel='linear')
@@ -280,16 +299,21 @@ all_male_open = get_division_entry(all_races, 'male', 'open')
 # analyse_race(all_male_open)
 
 # random_forest_classifier(all_male_open)
-analyse_rf_classifier(all_male_open)
+rf_classifier = pickle.load(open("rf_classifier.sav", 'rb'))
+my_times= ["4:15", "4:26", "5:40", "3:58", "4:31", "6:14", "4:23", "2:34", "4:37", "4:52", "4:16", "2:23", "4:13", "4:11", "4:42", "5:08"]
+predict_my_race(rf_classifier, my_times)
 
-# london2023 = load_one_file("hyroxData/S5 2023 London.csv")
-# london_male_open = get_division_entry(london2023, 'male', 'open')
-# male_open_sub_70 = get_filtered_df(london_male_open, column='total_time', value='1:10:00', lower_then=True)
-# analyse_race(male_open_sub_70)
-#
-# male_open_over_90 = get_filtered_df(london_male_open, column='total_time', value='1:30:00', lower_then=False)
-# line_plot_runs(male_open_over_90)
-#
-#
-# analyse_race(london_male_open)
+analyse_rf_classifier(all_races, rf_classifier)
+
+
+london2023 = load_one_file("hyroxData/S5 2023 London.csv")
+london_male_open = get_division_entry(london2023, 'male', 'open')
+male_open_sub_70 = get_filtered_df(london_male_open, column='total_time', value=75, lower_then=True)
+analyse_race(male_open_sub_70)
+
+male_open_over_90 = get_filtered_df(london_male_open, column='total_time', value=75, lower_then=False)
+line_plot_runs(male_open_over_90)
+
+
+analyse_race(london_male_open)
 
