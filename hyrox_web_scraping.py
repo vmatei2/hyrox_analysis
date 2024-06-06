@@ -279,7 +279,8 @@ class HyroxEvent:
         )
                 
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
-        df.drop(["id", "name"], axis=1, inplace=True)
+        # interesting - not very sure why I was dropping the name?
+        df.drop(["id"], axis=1, inplace=True)
         
         outdir = './hryoxData'
         if not os.path.exists(outdir):
