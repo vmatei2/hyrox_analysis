@@ -29,8 +29,10 @@ class Gender(Enum):
 
 ## Helper Functions
 def get_html(url: str):
-        response = request("GET", url)
-        return response.text
+    cookie_retrieval = request("GET", url)
+    cookie = cookie_retrieval.request.headers.get("Cookie")
+    response = request("GET", url, headers={"Cookie": cookie})
+    return response.text
 
 def removeprefix(x: str, prefix: str):
     if x.startswith(prefix):
@@ -49,15 +51,23 @@ class HyroxParticipant:
         self.link = link
         self._raw_splits = []
         self.splits = {}
+        self.ignore = False
 
     def get_timings(self):
         html = get_html(self.link)
         soup = BeautifulSoup(html, 'html.parser')
 
-        splits = soup.find(class_="detail-box box-splits")
-        split_rows = splits.find("tbody").find_all("tr")
+        try:
+            splits = soup.find(class_="detail-box box-splits")
+            split_rows = splits.find("tbody").find_all("tr")
+        except AttributeError:
+            self.ignore = True
+            return
 
         def get_diff(i: int):
+            if i >= len(split_rows):
+                return timedelta()
+
             raw = split_rows[i].select("td.diff")[0].text
             if "–" in raw:
                 return timedelta()
@@ -153,14 +163,13 @@ class HyroxParticipant:
         ]
 
 class HyroxEvent:
-    def __init__(self, event_id: str, season: int, has_country=False, doubles_no_id=True):
+    def __init__(self, event_id: str, season: int, print_name: str):
         self.event_id = event_id
         self.season = season
-        self.has_country = has_country
-        self.doubles_no_id = doubles_no_id
         self.event_name = ""
         self.event_participants = dict((x, dict((y, []) for y in Gender)) for x in Division)
         self.num_event_participants = dict((x, dict((y, 0) for y in Gender)) for x in Division)
+        self.print_name = print_name  # naming this varialbe print name more due to being lazy as it's 11PM and have a 6:30 wake-up tomorrow - don't want to interfere with the previous logic of setting event_name empty and filling it in later
 
     @property
     def participants(self):
@@ -171,12 +180,10 @@ class HyroxEvent:
         return arr
 
     def generate_url(self, page: int, division: Division, gender: Gender):
-        return f"https://hyrox.r.mikatiming.de/season-{self.season}/?page={page}&event={division.value}_{self.event_id}&num_results=100&pid=list&pidp=start&ranking=time_finish_netto&search%5Bsex%5D={gender.value}&search%5Bage_class%5D=%25&search%5Bnation%5D=%25"
+        return f"https://hyrox.r.mikatiming.com/season-{self.season}/?page={page}&event={division.value}_{self.event_id}&num_results=100&pid=list&pidp=start&ranking=time_finish_netto&search%5Bsex%5D={gender.value}&search%5Bage_class%5D=%25&search%5Bnation%5D=%25"
 
     def get_info(self):
-
         combinations = list(itertools.product(Division, Gender))
-        print("Getting event information for ", self.event_name)
         pbar = tqdm(combinations, desc="Retrieving participants")
         for division, gender in pbar:
             page = 1
@@ -195,6 +202,10 @@ class HyroxEvent:
                 if h2_title == "General Ranking / All":
                     break
 
+                list_headers = soup.select(".list-group-header .list-field")
+                if len(list_headers) > 0 and list_headers[0].text.strip() == "Race":
+                    break
+
                 if self.event_name == "":
                     self.event_name = f"S{self.season} {h2_title.strip()}"
                     if self.event_name == "S4 WorldChampionship - Leipzig":
@@ -207,30 +218,31 @@ class HyroxEvent:
 
                 list_rows = list(soup.find_all("li", class_="list-group-item row"))
                 list_rows.extend(list(soup.find_all("li", class_="list-active list-group-item row")))
-                country_col = 1 if self.has_country else 0
+
                 for row in list_rows:
                     fields = row.select(".list-field")
 
-                    if division == Division.doubles and self.season == 4 and self.doubles_no_id:
-                        id_field = None
-                        name_field = fields[2]
-                        age_field = fields[3]
-                        time_field = fields[6]
-                    else:
-                        # adding a count higher than 6, there are cases where the race results page looks very different, and the below extractions would fail
-                        if len(fields) > 6:
-                            id_field = fields[3 + country_col]
-                            name_field = fields[2]
-                            age_field = fields[4 + country_col]
-                            time_field = fields[7 + country_col]
-                            
-                        id = removeprefix(id_field.text.strip(), "Number") if id_field is not None else ""
-                    name = name_field.text.strip()
+                    id = ""
+                    name = ""
+                    age_group = ""
+                    time = ""
+                    link = ""
 
-
-                    link = f"https://hyrox.r.mikatiming.de/season-{self.season}/{name_field.a.get('href')}"
-                    age_group = removeprefix(age_field.text.strip(), "Age Group")
-                    time = removeprefix(time_field.text.strip(), "Total")
+                    for field_i in range(len(list_headers)):
+                        header = "".join(list_headers[field_i].find_all(string=True, recursive=False))
+                        field = fields[field_i]
+                        field_content = field.text.strip()
+                        if header == "Number":
+                            id = removeprefix(field_content, "Number")
+                        elif header == "Age Group":
+                            age_group = removeprefix(field_content, "Age Group")
+                            if age_group == "–":
+                                age_group = ""
+                        elif header == "Name" or header == "Member":
+                            name = field_content
+                            link = f"https://hyrox.r.mikatiming.com/season-{self.season}/{field.a.get('href')}"
+                        elif header == "Total":
+                            time = removeprefix(field_content, "Total")
 
                     participant = HyroxParticipant(
                         id=id,
@@ -252,6 +264,9 @@ class HyroxEvent:
             participant.get_timings()
 
         def participant_filter(p: HyroxParticipant):
+            if p.ignore:
+                return False
+
             if any(list(map(lambda x: x < timedelta(), p.splits["stations"]))):
                 return False
 
@@ -266,7 +281,7 @@ class HyroxEvent:
         for division, gender in combinations:
             self.event_participants[division][gender] = filter(participant_filter, self.event_participants[division][gender])
 
-    def save(self):
+    def save(self, directory: str = "/kaggle/working"):
 
         def participant_map(p: HyroxParticipant):
             arr = [self.event_id, self.event_name]
@@ -277,16 +292,24 @@ class HyroxEvent:
             np.array(list(map(participant_map, self.participants))),
             columns=["event_id", "event_name", "id", "name", "gender", "age_group", "division", "total_time", "work_time", "roxzone_time", "run_time", "run_1", "work_1", "roxzone_1", "run_2", "work_2", "roxzone_2", "run_3", "work_3", "roxzone_3", "run_4", "work_4", "roxzone_4", "run_5", "work_5", "roxzone_5", "run_6", "work_6", "roxzone_6", "run_7", "work_7", "roxzone_7", "run_8", "work_8", "roxzone_8"]
         )
-                
-        df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
-        # interesting - not very sure why I was dropping the name?
-        df.drop(["id"], axis=1, inplace=True)
-        
-        outdir = './hryoxData'
-        if not os.path.exists(outdir):
-            os.mkdir(outdir)
-        df.to_csv(f"{outdir}/{self.event_name}.csv", index=False)
 
+        df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
+        df.drop(["id", "name"], axis=1, inplace=True)
+
+        df.to_csv(os.path.join(directory, f"{self.event_name}.csv"), index=False)
+
+    def copy(self):
+        return self.__copy__()
+
+    def __copy__(self):
+        new_event = HyroxEvent(
+            event_id=self.event_id,
+            season=self.season
+        )
+        new_event.event_name = self.event_name
+        new_event.event_participants = self.event_participants
+        new_event.num_event_participants = self.num_event_participants
+        return new_event
 
 # example of retrieving data
 # s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
@@ -298,60 +321,95 @@ def save_events(events):
         try:
             event.get_info()
             event.save()
+            print('have saved event ', event.print_name)
         except Exception as e:
-            print("have caught the following error: ", e)
+            print(f"have caught exception {e} when storing down event {event.print_name} ")
 
-s5_london2023 = HyroxEvent(event_id="JGDMS4JI47A", season=5)
-s5_hongkong2023 = HyroxEvent(event_id="JGDMS4JI46F", season=5)
-s5_dallas2023 = HyroxEvent(event_id="JGDMS4JI470", season=5)
-s5_barcelona2023 = HyroxEvent(event_id="JGDMS4JI466", season=5)
-s5_hamburg2023 = HyroxEvent(event_id="JGDMS4JI473", season=5)
-s5_munchen2023 = HyroxEvent(event_id="JGDMS4JI464", season=5)
-s5_manchesterWorldChamps2023 = HyroxEvent(event_id="2EFMS4JI335", season=5)
-s5_rotterdam2023 = HyroxEvent(event_id="JGDMS4JI46E", season=5)
-s5_hannover2023 = HyroxEvent(event_id="JGDMS4JI46C", season=5)
-s5_anaheim2923 = HyroxEvent(event_id="JGDMS4JI472", season=5)
-s5_koln2023 = HyroxEvent(event_id="JGDMS4JI468", season=5)
-s5_malaga2023 = HyroxEvent(event_id="JGDMS4JI46A", season=5)
-s5_miami2023 = HyroxEvent(event_id="JGDMS4JI474", season=5)
-s5_karlsruhe2023 = HyroxEvent(event_id="JGDMS4JI465", season=5)
-s5_wien2023 = HyroxEvent(event_id="JGDMS4JI461", season=5)
-s5_houston2023 = HyroxEvent(event_id="JGDMS4JI462", season=5)
-s5_glasgow2023 = HyroxEvent(event_id="JGDMS4JI439", season=5)
-s5_chichago_americanChamps = HyroxEvent(event_id="JGDMS4JI44E", season=5)
-s5_bilbao2023 = HyroxEvent(event_id="JGDMS4JI44F", season=5)
-s5_stuttgart2023 = HyroxEvent(event_id="JGDMS4JI44D", season=5)
-s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5)
-s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5)
+# s5_london2023 = HyroxEvent(event_id="JGDMS4JI47A", season=5)
+# s5_hongkong2023 = HyroxEvent(event_id="JGDMS4JI46F", season=5)
+# s5_dallas2023 = HyroxEvent(event_id="JGDMS4JI470", season=5)
+# s5_barcelona2023 = HyroxEvent(event_id="JGDMS4JI466", season=5)
+# s5_hamburg2023 = HyroxEvent(event_id="JGDMS4JI473", season=5)
+# s5_munchen2023 = HyroxEvent(event_id="JGDMS4JI464", season=5)
+# s5_manchesterWorldChamps2023 = HyroxEvent(event_id="2EFMS4JI335", season=5)
+# s5_rotterdam2023 = HyroxEvent(event_id="JGDMS4JI46E", season=5)
+# s5_hannover2023 = HyroxEvent(event_id="JGDMS4JI46C", season=5)
+# s5_anaheim2923 = HyroxEvent(event_id="JGDMS4JI472", season=5)
+# s5_koln2023 = HyroxEvent(event_id="JGDMS4JI468", season=5)
+# s5_malaga2023 = HyroxEvent(event_id="JGDMS4JI46A", season=5)
+# s5_miami2023 = HyroxEvent(event_id="JGDMS4JI474", season=5)
+# s5_karlsruhe2023 = HyroxEvent(event_id="JGDMS4JI465", season=5)
+# s5_wien2023 = HyroxEvent(event_id="JGDMS4JI461", season=5)
+# s5_houston2023 = HyroxEvent(event_id="JGDMS4JI462", season=5)
+# s5_glasgow2023 = HyroxEvent(event_id="JGDMS4JI439", season=5)
+# s5_chichago_americanChamps = HyroxEvent(event_id="JGDMS4JI44E", season=5)
+# s5_bilbao2023 = HyroxEvent(event_id="JGDMS4JI44F", season=5)
+# s5_stuttgart2023 = HyroxEvent(event_id="JGDMS4JI44D", season=5)
+# s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5)
+# s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5)
+
+
+## 2024 DATA
+maastricth2024 = HyroxEvent(event_id="JGDMS4JI6AA", season=6, print_name="maastricht2024")
+turin2024 = HyroxEvent(event_id="JGDMS4JI6AB", season=6, print_name="turin2024")
+manchester2024 = HyroxEvent(event_id="JGDMS4JI6BA", season=6, print_name="manchester2024")
+dubai2024 = HyroxEvent(event_id="JGDMS4JI6CE", season=6, print_name="dubai2024")
+biblao2024 = HyroxEvent(event_id="JGDMS4JI6CD", season=6, print_name="bilbao2024")
+incheon2024 = HyroxEvent(event_id="JGDMS4JI6F5", season=6, print_name="incheon2024")
+katowice2024 = HyroxEvent(event_id="JGDMS4JI70A", season=6, print_name="katowice2024")
+fortLauderdale2024 = HyroxEvent(event_id="JGDMS4JI709", season=6, print_name="forLauderdale2024")
+madrid2024 = HyroxEvent(event_id="JGDMS4JI71D", season=6, print_name="madrid2024")
+glasgow2024 = HyroxEvent(event_id="JGDMS4JI70C", season=6, print_name="glasgow2024")
+karlshrue2024 = HyroxEvent(event_id="JGDMS4JI745", season=6, print_name="karlshrue2024")
+houston2024 = HyroxEvent(event_id="JGDMS4JI748", season=6, print_name="houston2024")
+copenhagen2024 = HyroxEvent(event_id="JGDMS4JI731", season=6, print_name="copenhagen2024")
+rotterdam2024 = HyroxEvent(event_id="JGDMS4JI747", season=6, print_name="rotterdam2024")
+malaga2024 = HyroxEvent(event_id="JGDMS4JI75A", season=6, print_name="malaga2024")
+koln2024 = HyroxEvent(event_id="JGDMS4JI771", season=6, print_name="koln2024")
+mexico2024 = HyroxEvent(event_id="JGDMS4JI76F",season=6, print_name="mexico2024")
+berlin2024 = HyroxEvent(event_id="JGDMS4JI781", season=6, print_name="berlin2024")
+bordeaux2024 = HyroxEvent(event_id="JGDMS4JI759", season=6, print_name="bordeaux2024")
+london2024 = HyroxEvent(event_id="JGDMS4JI7AA", season=6, print_name="london2024")
+gdansk2024 = HyroxEvent(event_id="JGDMS4JI7FB", season=6, print_name="gdansk2024")
+rimini2024 = HyroxEvent(event_id="JGDMS4JI80E", season=6, print_name="rimini2024")
+newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork2024")
 
 # store elements in the list for easier manipulation
-events_list = [
-    s5_london2023,
-    s5_hongkong2023,
-    s5_dallas2023,
-    s5_barcelona2023,
-    s5_hamburg2023,
-    s5_munchen2023,
-    s5_manchesterWorldChamps2023,
-    s5_rotterdam2023,
-    s5_hannover2023,
-    s5_anaheim2923,
-    s5_koln2023,
-    s5_malaga2023,
-    s5_miami2023,
-    s5_karlsruhe2023,
-    s5_wien2023,
-    s5_houston2023,
-    s5_glasgow2023,
-    s5_chichago_americanChamps,
-    s5_bilbao2023,
-    s5_stuttgart2023,
-    s5_manchester2023,
-    s5_euroChamps2023
-]
-save_events([s5_barcelona2023])
+# events_list2023 = [
+#     s5_london2023,
+#     s5_hongkong2023,
+#     s5_dallas2023,
+#     s5_barcelona2023,
+#     s5_hamburg2023,
+#     s5_munchen2023,
+#     s5_manchesterWorldChamps2023,
+#     s5_rotterdam2023,
+#     s5_hannover2023,
+#     s5_anaheim2923,
+#     s5_koln2023,
+#     s5_malaga2023,
+#     s5_miami2023,
+#     s5_karlsruhe2023,
+#     s5_wien2023,
+#     s5_houston2023,
+#     s5_glasgow2023,
+#     s5_chichago_americanChamps,
+#     s5_bilbao2023,
+#     s5_stuttgart2023,
+#     s5_manchester2023,
+#     s5_euroChamps2023
+# ]
 
-# save_events(events_list)
+events_list2024 = [
+    maastricth2024, turin2024, manchester2024, dubai2024, biblao2024, incheon2024,
+    katowice2024, fortLauderdale2024, madrid2024, glasgow2024, karlshrue2024,
+    houston2024, copenhagen2024, rotterdam2024, malaga2024, koln2024, mexico2024,
+    berlin2024, bordeaux2024, london2024, gdansk2024, rimini2024, newYork2024
+]
+
+save_events(events_list2024)
+#save_events([s5_barcelona2023])
+
 
 
 
