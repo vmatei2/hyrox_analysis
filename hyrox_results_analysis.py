@@ -38,6 +38,8 @@ def load():
     return csvs
 
 def load_one_file(path):
+    # quick short-circuit to exit the function while retrieving 2024 data, but still working on 2023 analysis
+    print(path)
     df = pd.read_csv(path)
     # sort by total time
     df = df.sort_values(by='total_time', ascending=True)
@@ -54,12 +56,12 @@ def load_one_file(path):
     df['CDF'] = (df.index + 1) / total_athletes
     df['Top Percentage'] = df['CDF'] * 100
     # let's round it
-    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x/5) * 5)
+    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x/20.0) * 20)
     return df
 
 
 def round_to_nearest_5(x):
-    return  np.round(x / 5)*5
+    return np.round(x / 5)*5
 
 def get_division_entry(df, gender, division):
     subset_df = df[(df['gender'] == gender) & (df['division'] == division)]
@@ -89,7 +91,7 @@ def extract_averages(df):
     mean_values_run = [df[col].mean() for col in RUN_LABELS]
     mean_values_station = [df[col].mean() for col in WORK_LABELS]
     mean_values_roxzone = [df[col].mean() for col in ROXZONE_LABELS]
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 12))
 
     plt.plot(range(1, 9), mean_values_run, 'ro-', label="Mean value for runs")
     plt.plot(range(1, 9), mean_values_station, "gx-", label="Mean value for stations")
@@ -168,6 +170,12 @@ def plot_distributions(df):
     plt.show()
 
 def line_plot_runs(df):
+    """
+    Function to line plot all runs of top 10 athletes
+    Main point behind this function is to explore whether we can see a pattern emergin in how the top athletes in Hyrox run across a race?
+    :param df:
+    :return:
+    """
 
     run_cols = df.filter(regex=r'^run_\d+$')
     # Transpose the filetered dataframe
@@ -183,44 +191,45 @@ def line_plot_runs(df):
     plt.legend()
     plt.show()
 
-def random_forest_classifier(df):
+def random_forest_classifier(df, save_as_name):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
-    rf = RandomForestClassifier(random_state=42)
-
+    random_state = 42
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
+    rf = RandomForestClassifier(random_state=random_state)
     params = {
-        'max_depth': [2,5,20],
-        'min_samples_leaf': [5,20,100],
+        'max_depth': [2, 5,12],
+        'min_samples_leaf': [5, 20, 100],
         'n_estimators': [10,25,50]
     }
-    # Instantiate the grid search model
     grid_search = GridSearchCV(estimator=rf, param_grid=params, cv=3, verbose=1, scoring="accuracy")
     grid_search.fit(X_train, y_train)
     print(f"Best score found through grid search was {grid_search.best_score_}")
     rf_classifier = grid_search.best_estimator_
+    filename = save_as_name + ".sav"
+    try:
+        pickle.dump(rf_classifier, open(filename, 'wb'))
+        print('have succesfully saved model')
+    except Exception as e:
+        print('Unfortunately caught exception: ', e)
 
-    filename = 'rf_classifier.sav'
-    pickle.dump(rf_classifier, open(filename, 'wb'))
-    plt.figure(figsize=(10, 10))
-    plot_tree(rf_classifier.estimators_[5], feature_names=X.columns, class_names=list(y.unique()))
+    plt.figure(figsize=(20, 12))
+    plot_tree(rf_classifier.estimators_[5], feature_names=X.columns, class_names=list(str(val) for val in y.unique()), fontsize=12)
     plt.show()
 
 
 def analyse_rf_classifier(df, rf_classifier):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=20)
     result = rf_classifier.score(X_test, y_test)
+    y_pred = rf_classifier.predict(X_test)
     print(result)
-
     feature_names = RUN_LABELS + STATIONS
     importances = pd.Series(rf_classifier.feature_importances_, index=feature_names)
     importances_sorted = importances.sort_values(ascending=False)
-
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(6, 6))
     sns.barplot(x=importances_sorted.values, y=importances_sorted.index, palette='viridis')
-
     plt.xlabel("Importance")
     plt.ylabel("Feature")
     plt.title("Feature Importance")
@@ -232,7 +241,6 @@ def predict_my_race(rf_model, run_station_times):
     run_station_times = np.array(run_station_times)
     prediction = rf_model.predict(run_station_times.reshape(1, -1))
     print(f"Your predicted percentile result given your run and station times is: {prediction}")
-
     return prediction
 
 
@@ -286,34 +294,28 @@ def get_correlation_matrix(df):
     g = sns.heatmap(corrmat, mask=mask, vmin=0, vmax=1, annot=True, cmap='RdYlGn')
     plt.show()
 
-def analyse_all_races():
+def load_all_races():
+    """
+    Wrapper on top of the load function to concat and return one dataframe containing all race data
+    :return:
+    """
     # get the data
     all_races = load()
     all_races = pd.concat(all_races, ignore_index=True)
     return all_races
 
+
 sns.set_style('darkgrid')
 
-all_races = analyse_all_races()
+all_races = load_all_races()
 all_male_open = get_division_entry(all_races, 'male', 'open')
-# analyse_race(all_male_open)
+analyse_race(all_male_open)
 
-# random_forest_classifier(all_male_open)
-rf_classifier = pickle.load(open("rf_classifier.sav", 'rb'))
-my_times= ["4:15", "4:26", "5:40", "3:58", "4:31", "6:14", "4:23", "2:34", "4:37", "4:52", "4:16", "2:23", "4:13", "4:11", "4:42", "5:08"]
-predict_my_race(rf_classifier, my_times)
+# load in the random forest classifier
+rf_classifier = pickle.load(open("all_men_races_classifier.sav", 'rb'))
 
-analyse_rf_classifier(all_races, rf_classifier)
+# my race times
+# my_times = ["4:15", "4:26", "5:40", "3:58", "4:31", "6:14", "4:23", "2:34", "4:37", "4:52", "4:16", "2:23", "4:13", "4:11", "4:42", "5:08"]
+# predict_my_race(rf_classifier, my_times)
 
-
-london2023 = load_one_file("hyroxData/S5 2023 London.csv")
-london_male_open = get_division_entry(london2023, 'male', 'open')
-male_open_sub_70 = get_filtered_df(london_male_open, column='total_time', value=75, lower_then=True)
-analyse_race(male_open_sub_70)
-
-male_open_over_90 = get_filtered_df(london_male_open, column='total_time', value=75, lower_then=False)
-line_plot_runs(male_open_over_90)
-
-
-analyse_race(london_male_open)
 

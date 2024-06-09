@@ -12,12 +12,11 @@ import os
 ## helper classes
 class Division(Enum):
     open = "H"
-    pro = "HPRO"
-    elite = "HE"
+    # pro = "HPRO"
     doubles = "HD"
-    relay = "HMR"
-    goruck = "HG"
-    goruck_doubles = "HDG"
+    # relay = "HMR"
+    # goruck = "HG"
+    # goruck_doubles = "HDG"
 
 
 class Gender(Enum):
@@ -185,6 +184,7 @@ class HyroxEvent:
     def get_info(self):
         combinations = list(itertools.product(Division, Gender))
         pbar = tqdm(combinations, desc="Retrieving participants")
+        print(f'Retrieving participants for {self.print_name}')
         for division, gender in pbar:
             page = 1
             while True:
@@ -256,6 +256,7 @@ class HyroxEvent:
                     self.event_participants[division][gender].append(participant)
 
                 if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
+                    print(f'have retrieved {len(self.event_participants[division][gender])} out of {self.num_event_participants[division][gender]}')
                     page += 1
                 else:
                     break
@@ -295,8 +296,9 @@ class HyroxEvent:
 
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
         df.drop(["id", "name"], axis=1, inplace=True)
-
-        df.to_csv(os.path.join(directory, f"{self.event_name}.csv"), index=False)
+        directory = os.path.dirname(__file__)
+        hyroxDirectory = directory + "/hyroxData"
+        df.to_csv(os.path.join(hyroxDirectory, f"{self.event_name}.csv"), index=False)
 
     def copy(self):
         return self.__copy__()
@@ -320,7 +322,7 @@ def save_events(events):
     # try catch in case issue with any event, make sure we are still saving all data for events without problems
         try:
             event.get_info()
-            event.save()
+            event.save(directory="/hyroxData")
             print('have saved event ', event.print_name)
         except Exception as e:
             print(f"have caught exception {e} when storing down event {event.print_name} ")
@@ -350,7 +352,7 @@ def save_events(events):
 
 
 ## 2024 DATA
-maastricth2024 = HyroxEvent(event_id="JGDMS4JI6AA", season=6, print_name="maastricht2024")
+# maastricth2024 = HyroxEvent(event_id="JGDMS4JI6AA", season=6, print_name="maastricht2024")
 turin2024 = HyroxEvent(event_id="JGDMS4JI6AB", season=6, print_name="turin2024")
 manchester2024 = HyroxEvent(event_id="JGDMS4JI6BA", season=6, print_name="manchester2024")
 dubai2024 = HyroxEvent(event_id="JGDMS4JI6CE", season=6, print_name="dubai2024")
@@ -401,16 +403,16 @@ newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork20
 # ]
 
 events_list2024 = [
-    maastricth2024, turin2024, manchester2024, dubai2024, biblao2024, incheon2024,
+    turin2024, manchester2024, dubai2024, biblao2024, incheon2024,
     katowice2024, fortLauderdale2024, madrid2024, glasgow2024, karlshrue2024,
     houston2024, copenhagen2024, rotterdam2024, malaga2024, koln2024, mexico2024,
     berlin2024, bordeaux2024, london2024, gdansk2024, rimini2024, newYork2024
 ]
+#
 
-save_events(events_list2024)
+events_list2024_leftoff = [london2024, gdansk2024, berlin2024]
+save_events(events_list2024_leftoff)
 #save_events([s5_barcelona2023])
-
-
 
 
 
