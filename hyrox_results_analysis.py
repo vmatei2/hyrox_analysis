@@ -73,14 +73,18 @@ def get_filtered_df(df, column, value, lower_then=True):
     return subset_df
 
 def analyse_race(df):
-    # let's plot all the values of each run
+    """
+    Function to analyse various aspects of the race data, including run times,
+    distributions and averages across each station and run
+    :param df:
+    :return:
+    """
     line_plot_runs(df)
     extract_averages(df)
     plot_distributions(df)
     plot_data_points(df, RUN_LABELS, 'Run analysis for Male Open', 'Runs')
     plot_data_points(df, WORK_LABELS, 'Station analysis for Male Open', 'Stations',
-                     ['SkiErg', 'SledPush', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry',
-                      'Sandbag Lunges', 'Wall Balls'])
+                     STATIONS)
 
 def extract_averages(df):
     """
@@ -313,9 +317,5 @@ analyse_race(all_male_open)
 
 # load in the random forest classifier
 rf_classifier = pickle.load(open("all_men_races_classifier.sav", 'rb'))
-
-# my race times
-# my_times = ["4:15", "4:26", "5:40", "3:58", "4:31", "6:14", "4:23", "2:34", "4:37", "4:52", "4:16", "2:23", "4:13", "4:11", "4:42", "5:08"]
-# predict_my_race(rf_classifier, my_times)
 
 
