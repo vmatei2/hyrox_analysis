@@ -14,18 +14,18 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.tree import plot_tree
 import pickle
 
-
 #  Global variables to be used for run and work/station labels throughout this analysis file!
 
 WORK_LABELS = []
 RUN_LABELS = []
 ROXZONE_LABELS = []
 STATIONS = ['SkiErg', 'SledPush', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry',
-                      'Sandbag Lunges', 'Wall Balls']
+            'Sandbag Lunges', 'Wall Balls']
 for i in range(1, 9):
     WORK_LABELS.append('work_' + str(i))
     RUN_LABELS.append('run_' + str(i))
     ROXZONE_LABELS.append('roxzone_' + str(i))
+
 
 def load():
     """
@@ -36,6 +36,7 @@ def load():
     csvlist = path2csv.glob("*.csv")
     csvs = [load_one_file(g) for g in csvlist]
     return csvs
+
 
 def load_one_file(path):
     # quick short-circuit to exit the function while retrieving 2024 data, but still working on 2023 analysis
@@ -56,21 +57,24 @@ def load_one_file(path):
     df['CDF'] = (df.index + 1) / total_athletes
     df['Top Percentage'] = df['CDF'] * 100
     # let's round it
-    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x/20.0) * 20)
+    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x / 20.0) * 20)
     return df
 
 
 def round_to_nearest_5(x):
-    return np.round(x / 5)*5
+    return np.round(x / 5) * 5
+
 
 def get_division_entry(df, gender, division):
     subset_df = df[(df['gender'] == gender) & (df['division'] == division)]
     return subset_df
 
+
 def get_filtered_df(df, column, value, lower_then=True):
     df = df.loc[df[column] < value] if lower_then else df.loc[df[column] > value]
     subset_df = df.sort_values(by='total_time', ascending=True)
     return subset_df
+
 
 def analyse_race(df):
     """
@@ -86,6 +90,7 @@ def analyse_race(df):
     plot_data_points(df, WORK_LABELS, 'Station analysis for Male Open', 'Stations',
                      STATIONS)
 
+
 def extract_averages(df):
     """
     Function to extract and plot the average time for each of the hyrox stations for the given df
@@ -95,25 +100,42 @@ def extract_averages(df):
     mean_values_run = [df[col].mean() for col in RUN_LABELS]
     mean_values_station = [df[col].mean() for col in WORK_LABELS]
     mean_values_roxzone = [df[col].mean() for col in ROXZONE_LABELS]
-    plt.figure(figsize=(10, 12))
 
-    plt.plot(range(1, 9), mean_values_run, 'ro-', label="Mean value for runs")
-    plt.plot(range(1, 9), mean_values_station, "gx-", label="Mean value for stations")
-    plt.plot(range(1, 9), mean_values_roxzone, 'y+-', label="Mean value for roxzones")
+    fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    plt.xlabel('Row/Station')
+    # Plot mean values for runs and roxzones on the first x-axis
+    ax1.plot(range(1, 9), mean_values_run, 'ro-', label='Mean Value for Runs')
+    ax1.plot(range(1, 9), mean_values_roxzone, 'y+-', label='Mean Value for Roxzones')
 
-    xticks = [f'{run}/{station}' for run, station in zip(RUN_LABELS, STATIONS)]
+    # Set labels for the first x-axis and y-axis
+    ax1.set_xlabel('Runs')
+    ax1.set_ylabel('Time (minutes)')
+    ax1.set_title('Average Times for Runs, Stations, and Roxzones')
+    ax1.grid(True)
+    ax1.legend(loc='upper left')
 
-    plt.ylabel('Time (minutes)')
-    plt.title('Avg Times for Runs and Stations')
+    # Create the second x-axis for stations
+    ax2 = ax1.twiny()
+    offset = 5
+    ax2.plot(np.array(range(1, 9)) + offset, mean_values_station, "gx-", label="Mean Value for Stations")
+    ax2.set_xlabel('Stations')
+    ax2.tick_params(axis='x', colors='green')
 
-    plt.xticks(range(1, 9), xticks, rotation=45)
-    plt.grid(True)
-    plt.legend()
+    # Customize x-ticks for both x-axes
+    xticks_run_roxzone = [f'Run {i+1}/RZ{i+1}' for i in range(8)]
+    xticks_stations = [f'Station {i+1}' for i in range(8)]
+    ax1.set_xticks(range(1, 9))
+    ax1.set_xticklabels(xticks_run_roxzone, rotation=45)
+    ax2.set_xticks(np.array(range(1, 9)) + offset)
+    ax2.set_xticklabels(xticks_stations, rotation=45)
+
+    # Add legend for the second x-axis
+    ax2.legend(loc='upper right')
+
+    # Adjust the layout to prevent overlap
+    fig.tight_layout()
 
     plt.show()
-
 def extract_general_statistics(df):
     df['total_time'] = pd.to_timedelta(df['total_time'])
 
@@ -156,14 +178,14 @@ def plot_data_points(df, columns_to_extract, title, xlabel, x_labels=None):
 
     return df
 
+
 def plot_distributions(df):
     fig, axs = plt.subplots(2, 4, figsize=(12, 8))
 
     for i, ax in enumerate(axs.flat):
-        ax.hist(df[f'run_{i+1}'], bins=10,color='blue', alpha=0.5, label=f'Run{i+1}')
+        ax.hist(df[f'run_{i + 1}'], bins=10, color='blue', alpha=0.5, label=f'Run{i + 1}')
 
-
-        ax.hist(df[f'work_{i+1}'], bins=10,color='red', alpha=0.5, label=STATIONS[i])
+        ax.hist(df[f'work_{i + 1}'], bins=10, color='red', alpha=0.5, label=STATIONS[i])
 
         ax.set_xlabel('Time (minutes)')
         ax.set_ylabel('Number of athletes')
@@ -173,10 +195,11 @@ def plot_distributions(df):
     plt.tight_layout()
     plt.show()
 
+
 def line_plot_runs(df):
     """
     Function to line plot all runs of top 10 athletes
-    Main point behind this function is to explore whether we can see a pattern emergin in how the top athletes in Hyrox run across a race?
+    Main point behind this function is to explore whether we can see a pattern emerging in how the top athletes in Hyrox run across a race?
     :param df:
     :return:
     """
@@ -195,6 +218,7 @@ def line_plot_runs(df):
     plt.legend()
     plt.show()
 
+
 def random_forest_classifier(df, save_as_name):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
@@ -202,9 +226,9 @@ def random_forest_classifier(df, save_as_name):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
     rf = RandomForestClassifier(random_state=random_state)
     params = {
-        'max_depth': [2, 5,12],
+        'max_depth': [2, 5, 12],
         'min_samples_leaf': [5, 20, 100],
-        'n_estimators': [10,25,50]
+        'n_estimators': [10, 25, 50]
     }
     grid_search = GridSearchCV(estimator=rf, param_grid=params, cv=3, verbose=1, scoring="accuracy")
     grid_search.fit(X_train, y_train)
@@ -218,7 +242,8 @@ def random_forest_classifier(df, save_as_name):
         print('Unfortunately caught exception: ', e)
 
     plt.figure(figsize=(20, 12))
-    plot_tree(rf_classifier.estimators_[5], feature_names=X.columns, class_names=list(str(val) for val in y.unique()), fontsize=12)
+    plot_tree(rf_classifier.estimators_[5], feature_names=X.columns, class_names=list(str(val) for val in y.unique()),
+              fontsize=12)
     plt.show()
 
 
@@ -240,7 +265,14 @@ def analyse_rf_classifier(df, rf_classifier):
 
     plt.show()
 
+
 def predict_my_race(rf_model, run_station_times):
+    """
+    Function to predict an athlete's percentile finish within a Hyrox race
+    :param rf_model: the trained machine learning model (assumed to be RF in the context of this project - technically function could take any type of model as input)
+    :param run_station_times: array of float values representing an athlete's times on the stations and the runs
+    :return:
+    """
     run_station_times = convert_string_times_to_model_inputs(run_station_times)
     run_station_times = np.array(run_station_times)
     prediction = rf_model.predict(run_station_times.reshape(1, -1))
@@ -261,6 +293,7 @@ def convert_string_times_to_model_inputs(times):
         float_list.append(total_minutes)
     return float_list
 
+
 def svm_model(df):
     clf = svm.SVC(kernel='linear')
     X = df[RUN_LABELS + WORK_LABELS]
@@ -277,6 +310,7 @@ def svm_model(df):
     results_df['Difference'] = abs(y_pred - y_test)
     print("Accuracy: ", metrics.accuracy_score(y_test, y_pred))
 
+
 def f_importances(coef, names, top=-1):
     imp = coef
     imp, names = zip(*sorted(list(zip(imp, names))))
@@ -289,6 +323,7 @@ def f_importances(coef, names, top=-1):
     plt.yticks(range(top), names[::-1][0:top])
     plt.show()
 
+
 def get_correlation_matrix(df):
     X = df[RUN_LABELS + WORK_LABELS + ['Top Percentage']]
     # get the correlations of each fearures in dataset
@@ -297,6 +332,7 @@ def get_correlation_matrix(df):
     mask = np.triu(np.ones_like(X.corr(), dtype=np.bool_))
     g = sns.heatmap(corrmat, mask=mask, vmin=0, vmax=1, annot=True, cmap='RdYlGn')
     plt.show()
+
 
 def load_all_races():
     """
@@ -317,5 +353,3 @@ analyse_race(all_male_open)
 
 # load in the random forest classifier
 rf_classifier = pickle.load(open("all_men_races_classifier.sav", 'rb'))
-
-
