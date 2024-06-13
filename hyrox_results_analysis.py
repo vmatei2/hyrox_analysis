@@ -97,15 +97,31 @@ def extract_averages(df):
     :param df:
     :return:
     """
-    mean_values_run = [df[col].mean() for col in RUN_LABELS]
-    mean_values_station = [df[col].mean() for col in WORK_LABELS]
-    mean_values_roxzone = [df[col].mean() for col in ROXZONE_LABELS]
+    mean_values_run = []
+    mean_values_station = []
+    mean_values_roxzone = []
+    run_count = 0
+    station_count = 0
+    for i in range(16):
+        if i%2 == 0:
+            mean_values_run.append(df[RUN_LABELS[run_count]].mean())
+            mean_values_roxzone.append(df[ROXZONE_LABELS[run_count]].mean())
+            mean_values_station.append(0)
+            run_count += 1
+        else:
+            mean_values_run.append(0)
+            mean_values_roxzone.append(0)
+            mean_values_station.append(df[WORK_LABELS[station_count]].mean())
+            station_count += 1
+    # mean_values_run = [df[col].mean() for col in RUN_LABELS]
+    # mean_values_station = [df[col].mean() for col in WORK_LABELS]
+    # mean_values_roxzone = [df[col].mean() for col in ROXZONE_LABELS]
 
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
     # Plot mean values for runs and roxzones on the first x-axis
-    ax1.plot(range(1, 9), mean_values_run, 'ro-', label='Mean Value for Runs')
-    ax1.plot(range(1, 9), mean_values_roxzone, 'y+-', label='Mean Value for Roxzones')
+    ax1.plot(range(1, 17), mean_values_run, 'ro', label='Mean Value for Runs')
+    ax1.plot(range(1, 17), mean_values_roxzone, 'y+', label='Mean Value for Roxzones')
 
     # Set labels for the first x-axis and y-axis
     ax1.set_xlabel('Runs')
@@ -117,18 +133,18 @@ def extract_averages(df):
     # Create the second x-axis for stations
     ax2 = ax1.twiny()
     offset = 5
-    ax2.plot(np.array(range(1, 9)) + offset, mean_values_station, "gx-", label="Mean Value for Stations")
+    ax2.plot(np.array(range(1, 17)), mean_values_station, "gx", label="Mean Value for Stations")
     ax2.set_xlabel('Stations')
-    ax2.tick_params(axis='x', colors='green')
+    ax2.tick_params(axis='x')
 
     # Customize x-ticks for both x-axes
     xticks_run_roxzone = [f'Run {i+1}/RZ{i+1}' for i in range(8)]
     xticks_stations = [f'Station {i+1}' for i in range(8)]
-    ax1.set_xticks(range(1, 9))
+    ax1.set_xticks(range(1, 16, 2))
     ax1.set_xticklabels(xticks_run_roxzone, rotation=45)
-    ax2.set_xticks(np.array(range(1, 9)) + offset)
+    ax2.set_xticks(np.array(range(2, 17, 2)))
     ax2.set_xticklabels(xticks_stations, rotation=45)
-
+    ax1.set_ylim([0.2, 9])
     # Add legend for the second x-axis
     ax2.legend(loc='upper right')
 
