@@ -39,6 +39,11 @@ def load():
 
 
 def load_one_file(path):
+    """
+    Function to simply load one Hyrox race, given a specified file path to a .csv file
+    :param path:
+    :return:
+    """
     # quick short-circuit to exit the function while retrieving 2024 data, but still working on 2023 analysis
     print(path)
     df = pd.read_csv(path)
@@ -84,14 +89,14 @@ def analyse_race(df):
     :return:
     """
     line_plot_runs(df)
-    extract_averages(df)
+    scatter_plot_averages(df)
     plot_distributions(df)
     plot_data_points(df, RUN_LABELS, 'Run analysis for Male Open', 'Runs')
     plot_data_points(df, WORK_LABELS, 'Station analysis for Male Open', 'Stations',
                      STATIONS)
 
 
-def extract_averages(df):
+def scatter_plot_averages(df):
     """
     Function to extract and plot the average time for each of the hyrox stations for the given df
     :param df:
@@ -152,6 +157,73 @@ def extract_averages(df):
     fig.tight_layout()
 
     plt.show()
+
+
+def line_plot_averages(df):
+    """
+    Function to line plot averages of top 20 athletes against the averages of all athletes and those of the bottom 20
+    The main aim of this function is to search for common patterns that can help separate the best performing athletes in a race from the bottom ones
+    :param df:
+    :return:
+    """
+    top_20 = df.head(20)
+    bottom_20 = df.tail(20)
+    top_20_runs, top_20_stations = extract_mean_values_runs_stations(top_20)
+    bottom_20_runs, bottom_20_stations = extract_mean_values_runs_stations(bottom_20)
+    average_runs, average_stations = extract_mean_values_runs_stations(df)
+
+    # Plot the different values for runs
+    plot_top_bottom_average(top_20_runs, bottom_20_runs, average_runs, 'run')
+
+    # Plot the different values for stations
+    plot_top_bottom_average(top_20_stations, bottom_20_stations, average_stations, 'station')
+
+def plot_top_bottom_average(top_20, bottom_20, average, run_or_stations):
+    """
+    Function to plot the avearge values for top 20, bottom 20 and all athletes on runs or stations
+    :param top_20:
+    :param bottom_20:
+    :param average:
+    run_or_station: str -- value to be used in label
+    :return:
+    """
+    plt.figure(figsize=(6, 6 ))
+    average_of_top_20 = sum(top_20) / len(top_20)
+    average_of_bottom_20 = sum(bottom_20) / len(bottom_20)
+    average_of_all = sum(average) / len(average)
+    average_of_top_20_list = [average_of_top_20 for x in top_20]
+    average_of_bottom_20_list = [average_of_bottom_20 for x in bottom_20]
+    average_of_all_list = [average_of_all for x in average]
+    plt.plot(range(1, 9), top_20, 'ro-', label=f'Average {run_or_stations} times of top 20 athletes')
+    plt.plot(range(1, 9), average_of_top_20_list, 'r--', label="Average time of the top 20")
+    plt.plot(range(1, 9), bottom_20, 'go-', label=f'Average {run_or_stations} times of bottom 20 athletes')
+    plt.plot(range(1, 9), average_of_bottom_20_list, 'g--', label="Average time of bottom 20")
+    plt.plot(range(1, 9), average, 'yo-', label=f'Average {run_or_stations} times of all athletes')
+    plt.plot(range(1, 9), average_of_all_list,'y--', label="Average time all athletes ")
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel("")
+    if run_or_stations == "run":
+        xticks = [f'{run}' for run in RUN_LABELS]
+    elif run_or_stations == "station":
+        xticks = [f'{station}' for station in STATIONS]
+    plt.xticks(range(1, 9), xticks, rotation=45)
+    plt.ylabel("Time (Minutes)", fontsize=12)
+    plt.show()
+
+
+
+def extract_mean_values_runs_stations(df):
+    """
+    Function to extract the mean values on both runs and stations
+    This is to be used as we aim to analyse differences between top 20 / bottom 20 / and all people in a Hyrox race - avoid having repeated code
+    :param df:
+    :return:
+    """
+    mean_value_runs = [df[col].mean() for col in RUN_LABELS]
+    mean_value_stations = [df[col].mean() for col in WORK_LABELS]
+    return mean_value_runs, mean_value_stations
+
 def extract_general_statistics(df):
     df['total_time'] = pd.to_timedelta(df['total_time'])
 
@@ -360,12 +432,21 @@ def load_all_races():
     all_races = pd.concat(all_races, ignore_index=True)
     return all_races
 
+def load_classifier(classifier_path:str):
+    """
+    Function to load in the classifier model that's been trained and saved down
+    :param clasifier_path: path to the classifier
+    :return: loaded model
+    """
+    rf_classifier = pickle.load(open(classifier_path, 'rb'))
+    return rf_classifier
+
 
 sns.set_style('darkgrid')
+# all_races = load_all_races()
+# all_male_open = get_division_entry(all_races, 'male', 'open')
+# analyse_race(all_male_open)
+s5_london = load_one_file("hyroxData/S5 2023 London.csv")
+s5_london_male_open = get_division_entry(s5_london, 'male', 'open')
 
-all_races = load_all_races()
-all_male_open = get_division_entry(all_races, 'male', 'open')
-analyse_race(all_male_open)
-
-# load in the random forest classifier
-rf_classifier = pickle.load(open("all_men_races_classifier.sav", 'rb'))
+line_plot_averages(s5_london_male_open)
