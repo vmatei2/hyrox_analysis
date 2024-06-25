@@ -62,7 +62,7 @@ def load_one_file(path):
     df['CDF'] = (df.index + 1) / total_athletes
     df['Top Percentage'] = df['CDF'] * 100
     # let's round it
-    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x / 20.0) * 20)
+    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x / 10.0) * 10)
     return df
 
 
@@ -338,7 +338,7 @@ def random_forest_classifier(df, save_as_name):
 def analyse_rf_classifier(df, rf_classifier):
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=20)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
     result = rf_classifier.score(X_test, y_test)
     y_pred = rf_classifier.predict(X_test)
     print(result)
@@ -446,7 +446,9 @@ sns.set_style('darkgrid')
 # all_races = load_all_races()
 # all_male_open = get_division_entry(all_races, 'male', 'open')
 # analyse_race(all_male_open)
-s5_london = load_one_file("hyroxData/S5 2023 London.csv")
-s5_london_male_open = get_division_entry(s5_london, 'male', 'open')
+# s5_london = load_one_file("hyroxData/S5 2023 London.csv")
+# s5_london_male_open = get_division_entry(s5_london, 'male', 'open')
 
-line_plot_averages(s5_london_male_open)
+all_races = load_all_races()
+classifier = load_classifier("rf_classifier.sav")
+analyse_rf_classifier(all_races, classifier)
