@@ -32,7 +32,7 @@ def load():
     Function to load in all data from the folder and return a list of csvs
     :return:
     """
-    path2csv = Path("hyroxData")
+    path2csv = Path("assets/hyroxData")
     csvlist = path2csv.glob("*.csv")
     csvs = [load_one_file(g) for g in csvlist]
     return csvs
@@ -62,7 +62,7 @@ def load_one_file(path):
     df['CDF'] = (df.index + 1) / total_athletes
     df['Top Percentage'] = df['CDF'] * 100
     # let's round it
-    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x / 10.0) * 10)
+    df['Top Percentage'] = df['Top Percentage'].map(lambda x: np.round(x / 20.0) * 20)
     return df
 
 
@@ -383,6 +383,11 @@ def convert_string_times_to_model_inputs(times):
 
 
 def svm_model(df):
+    """
+    Function for training and evaluating an SVM model on the data provided
+    :param df:
+    :return:
+    """
     clf = svm.SVC(kernel='linear')
     X = df[RUN_LABELS + WORK_LABELS]
     y = df['Top Percentage']
@@ -442,13 +447,8 @@ def load_classifier(classifier_path:str):
     return rf_classifier
 
 
-sns.set_style('darkgrid')
-# all_races = load_all_races()
-# all_male_open = get_division_entry(all_races, 'male', 'open')
-# analyse_race(all_male_open)
-# s5_london = load_one_file("hyroxData/S5 2023 London.csv")
-# s5_london_male_open = get_division_entry(s5_london, 'male', 'open')
+if __name__ == '__main__':
 
-all_races = load_all_races()
-classifier = load_classifier("rf_classifier.sav")
-analyse_rf_classifier(all_races, classifier)
+    all_races = load_all_races()
+    random_forest_classifier(all_races, "test_classifier")
+

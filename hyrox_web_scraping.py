@@ -295,7 +295,7 @@ class HyroxEvent:
         )
 
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
-        df.drop(["id", "name"], axis=1, inplace=True)
+        df.drop(["id"], axis=1, inplace=True)
         directory = os.path.dirname(__file__)
         hyroxDirectory = directory + "/hyroxData"
         df.to_csv(os.path.join(hyroxDirectory, f"{self.event_name}.csv"), index=False)
@@ -401,18 +401,19 @@ newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork20
 #     s5_manchester2023,
 #     s5_euroChamps2023
 # ]
+if __name__ == '__main__':
 
-events_list2024 = [
+    events_list2024 = [
     turin2024, manchester2024, dubai2024, biblao2024, incheon2024,
     katowice2024, fortLauderdale2024, madrid2024, glasgow2024, karlshrue2024,
     houston2024, copenhagen2024, rotterdam2024, malaga2024, koln2024, mexico2024,
     berlin2024, bordeaux2024, london2024, gdansk2024, rimini2024, newYork2024
-]
+    ]
 #
 
-events_list2024_leftoff = [london2024, gdansk2024, berlin2024]
-save_events(events_list2024_leftoff)
-#save_events([s5_barcelona2023])
+    events_list2024_leftoff = [berlin2024]
+    save_events(events_list2024_leftoff)
+    #save_events([s5_barcelona2023])
 
 
 
