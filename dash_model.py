@@ -8,7 +8,8 @@ from dash.dependencies import Input
 import plotly.express as px
 import hyrox_results_analysis as _hra
 import data_loading_helpers as _dlh
-import pandas as pd
+import pandas as _pd
+import constants as _constants
 
 
 all_race_names = _dlh.list_files_in_directory("/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData")
@@ -47,10 +48,10 @@ app.layout = html.Div([
 # first callback, that makes use of the 'Store' component to be then used by subsequent callback in our function
 @app.callback(Output('race_df','data'), Input('Race', 'value'))
 def load_data(selected_race):
-    if selected_race.lower() == "all races above":
+    if selected_race.lower() == _constants.ALL_RACES:
         df = _hra.load_all_races()
     else:
-        df = pd.read_csv(f"/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData/{selected_race}.csv")
+        df = _pd.read_csv(f"/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData/{selected_race}.csv")
     # data needs to be serialized into a JSON string before being placed into storage
     return df.to_json(date_format='iso', orient='split')
 @app.callback(Output('race-info', 'children'), Input('race_df', 'data'), Input('Race', 'value'))
