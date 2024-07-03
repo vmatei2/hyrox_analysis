@@ -11,6 +11,7 @@ def list_files_in_directory(directory):
 
         # filter out directories, only keep files, remove .csv from filename
         files = [item.removesuffix(".csv") for item in items if os.path.isfile(os.path.join(directory, item))]
+        files.append("All races above")
         return files
     except Exception as e:
         return f"Error loading files in the directory: {e}"
