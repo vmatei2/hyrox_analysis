@@ -67,11 +67,19 @@ app.layout = html.Div([
     dbc.Row([
         dbc.Col(sidebar, width=3),
         dbc.Col(html.Div(children=[
-            html.Div(id='race-info', style={
-                'textAlign': 'center',
-                'marginTop': '20px'
-            }),
-            dcc.Graph(figure={}, id="race_graph")
+            dcc.Loading(
+                id="loading-race-info",
+                type="circle",
+                children=html.Div(id='race-info', style={
+                    'textAlign': 'center',
+                    'marginTop': '20px'
+                })
+            ),
+            dcc.Loading(
+                id="loading-race-graph",
+                type="circle",
+                children=dcc.Graph(figure={}, id="race_graph")
+            )
         ]), width=9)
     ]),
     dcc.Store(id='race_df')
