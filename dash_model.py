@@ -1,63 +1,59 @@
 import dash
-from dash import dcc
-from dash import html
+from dash import dcc, html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Output
-from dash.dependencies import Input
+from dash.dependencies import Output, Input
 
-import plotly.express as px
-import hyrox_results_analysis as _hra
-import data_loading_helpers as _dlh
-import pandas as _pd
-import constants as _constants
-import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
+import hyrox_results_analysis as _hra
+import data_loading_helpers as _dlh
+import constants as _constants
 
-all_race_names = _dlh.list_files_in_directory("/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData")
+# Constants and styles
+DATA_PATH = "/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData"
+all_race_names = _dlh.list_files_in_directory(DATA_PATH)
 
 SIDEBAR_STYLE = {
     "position": "fixed",
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "250px",  # Adjusted width for better content spacing
-    "padding": "20px",  # Added padding for better spacing
+    "width": "250px",
+    "padding": "20px",
     "background-color": "#f8f9fa",
 }
 
+# Sidebar layout
 sidebar = html.Div(
     [
         html.P('Select a race:'),
         dcc.Dropdown(
             id="Race",
-            options=[{'label': i, 'value': i} for i in all_race_names],
+            options=[{'label': name, 'value': name} for name in all_race_names],
             value=all_race_names[0],
             style={'width': '100%'}
         ),
         html.P('Select Division:'),
-        # Add your division dropdown or input here,
         dcc.Dropdown(
             id="Division",
-            options=[], # to be populated once race is selected
+            options=[],
             value='all',
             style={'width': '100%'}
         ),
         html.P('Select Gender:'),
         dcc.Dropdown(
             id='Gender',
-            options=[], # to be populated once race is selected,
+            options=[],
             value='all',
             style={'width': '100%'}
-        )
-        # Add your gender dropdown or input here
+        ),
     ],
     style=SIDEBAR_STYLE
 )
 
-# Layout of the application
+# Application layout
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
-
 app.layout = html.Div([
     dbc.Row([
         dbc.Col(
@@ -69,7 +65,7 @@ app.layout = html.Div([
         )
     ]),
     dbc.Row([
-        dbc.Col(sidebar, width=3),  # Adjusted width to match the sidebar's new width
+        dbc.Col(sidebar, width=3),
         dbc.Col(html.Div(children=[
             html.Div(id='race-info', style={
                 'textAlign': 'center',
@@ -81,58 +77,71 @@ app.layout = html.Div([
     dcc.Store(id='race_df')
 ])
 
-
-# First callback, that makes use of the 'Store' component to be then used by subsequent callback in our function
+# Callbacks
 @app.callback(Output('race_df', 'data'), Input('Race', 'value'))
 def load_data(selected_race):
-    if selected_race.lower() == _constants.ALL_RACES.lower():
-        df = _hra.load_all_races()
-    else:
-        df = _hra.load_one_file(f"/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData/{selected_race}.csv")
-    # Data needs to be serialized into a JSON string before being placed into storage
-    return df.to_json()
+    """Load race data based on the selected race."""
+    try:
+        if selected_race.lower() == _constants.ALL_RACES.lower():
+            df = _hra.load_all_races()
+        else:
+            df = _hra.load_one_file(f"{DATA_PATH}/{selected_race}.csv")
+        return df.to_json()
+    except Exception as e:
+        return pd.DataFrame().to_json()  # Return an empty DataFrame in case of an error
 
-@app.callback(Output('Division', 'options'),
-              Input('race_df', 'data'))
+@app.callback(Output('Division', 'options'), Input('race_df', 'data'))
 def update_division_options(race_df):
-    df = _pd.read_json(race_df)
-    divisions = df['division'].unique().tolist() # convert to list, rather than working with the numpy array returned by the df.unique() function
-    divisions.append('all')
-    return [{'label': division, 'value': division} for division in divisions]
+    """Update division dropdown options based on the loaded race data."""
+    try:
+        df = pd.read_json(race_df)
+        divisions = df['division'].unique().tolist()
+        divisions.insert(0, 'all')
+        return [{'label': division, 'value': division} for division in divisions]
+    except Exception as e:
+        return []
 
-@app.callback(Output('Gender', 'options'),
-              Input('race_df', 'data'))
+@app.callback(Output('Gender', 'options'), Input('race_df', 'data'))
 def update_gender_options(race_df):
-    df = _pd.read_json(race_df)
-    genders = df['gender'].unique().tolist()
-    genders.append('all')
-    return [{'label': gender, 'value': gender} for gender in genders]
+    """Update gender dropdown options based on the loaded race data."""
+    try:
+        df = pd.read_json(race_df)
+        genders = df['gender'].unique().tolist()
+        genders.insert(0, 'all')
+        return [{'label': gender, 'value': gender} for gender in genders]
+    except Exception as e:
+        return []
 
-@app.callback(Output('race-info', 'children'), Input('race_df', 'data'), Input('Race', 'value'))
+@app.callback(Output('race-info', 'children'), [Input('race_df', 'data'), Input('Race', 'value')])
 def update_race_info(race_df, selected_race):
-    df = _pd.read_json(race_df)
-    info_message = f"Race: {selected_race}, Number of entries: {len(df)}"
-    return info_message
+    """Update race information based on the loaded race data."""
+    try:
+        df = pd.read_json(race_df)
+        info_message = f"Race: {selected_race}, Number of entries: {len(df)}"
+        return info_message
+    except Exception as e:
+        return "Race: N/A, Number of entries: N/A"
 
-
-# Callback function for updating the race plot
 @app.callback(Output('race_graph', 'figure'), Input('race_df', 'data'))
 def update_graph(race_df):
-    df = _pd.read_json(race_df)
-    mean_value_runs, mean_value_stations = _hra.extract_mean_values_runs_stations(df)
-    x_vals = np.array((range(len(mean_value_runs))))
-    fig = go.Figure(
-        data=[
-            go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="markers+text",
-                       textposition='top center'),
-            go.Scatter(x=x_vals, y=mean_value_stations, name='Stations', text=_constants.STATIONS, mode="markers+text",
-                       textposition='top center')
-        ],
-        layout={"xaxis": {"title": "Runs/Stations Numbers"}, "yaxis": {"title": "Time (Minutes)"},
-                "title": "Average Times Analysis"}
-    )
-    return fig
-
+    """Update race graph based on the loaded race data."""
+    try:
+        df = pd.read_json(race_df)
+        mean_value_runs, mean_value_stations = _hra.extract_mean_values_runs_stations(df)
+        x_vals = np.arange(len(mean_value_runs))
+        fig = go.Figure(
+            data=[
+                go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="markers+text",
+                           textposition='top center'),
+                go.Scatter(x=x_vals, y=mean_value_stations, name='Stations', text=_constants.STATIONS, mode="markers+text",
+                           textposition='top center')
+            ],
+            layout={"xaxis": {"title": "Runs/Stations Numbers"}, "yaxis": {"title": "Time (Minutes)"},
+                    "title": "Average Times Analysis"}
+        )
+        return fig
+    except Exception as e:
+        return go.Figure()  # Return an empty figure in case of an error
 
 if __name__ == '__main__':
     app.run_server(debug=True)
