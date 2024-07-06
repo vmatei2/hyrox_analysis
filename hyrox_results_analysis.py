@@ -13,18 +13,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.tree import plot_tree
 import pickle
-
+import constants as _constants
 #  Global variables to be used for run and work/station labels throughout this analysis file!
 
-WORK_LABELS = []
-RUN_LABELS = []
-ROXZONE_LABELS = []
-STATIONS = ['SkiErg', 'SledPush', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry',
-            'Sandbag Lunges', 'Wall Balls']
-for i in range(1, 9):
-    WORK_LABELS.append('work_' + str(i))
-    RUN_LABELS.append('run_' + str(i))
-    ROXZONE_LABELS.append('roxzone_' + str(i))
+
 
 
 def load():
@@ -53,7 +45,7 @@ def load_one_file(path):
     df = df.reset_index(drop=True)
     df['Position'] = range(1, len(df) + 1)
     # pre-processing part
-    for col in RUN_LABELS + WORK_LABELS + ROXZONE_LABELS + ["total_time"]:
+    for col in _constants.RUN_LABELS + _constants.WORK_LABELS + _constants.ROXZONE_LABELS + ["total_time"]:
         df[col] = pd.to_timedelta(df[col])
         # convert to minutes
         df[col] = df[col].dt.total_seconds() / 60.0
@@ -91,9 +83,9 @@ def analyse_race(df):
     line_plot_runs(df)
     scatter_plot_averages(df)
     plot_distributions(df)
-    plot_data_points(df, RUN_LABELS, 'Run analysis for Male Open', 'Runs')
-    plot_data_points(df, WORK_LABELS, 'Station analysis for Male Open', 'Stations',
-                     STATIONS)
+    plot_data_points(df, _constants.RUN_LABELS, 'Run analysis for Male Open', 'Runs')
+    plot_data_points(df, _constants.WORK_LABELS , 'Station analysis for Male Open', 'Stations',
+                     _constants.STATIONS)
 
 
 def scatter_plot_averages(df):
@@ -109,14 +101,14 @@ def scatter_plot_averages(df):
     station_count = 0
     for i in range(16):
         if i%2 == 0:
-            mean_values_run.append(df[RUN_LABELS[run_count]].mean())
-            mean_values_roxzone.append(df[ROXZONE_LABELS[run_count]].mean())
+            mean_values_run.append(df[_constants.RUN_LABELS[run_count]].mean())
+            mean_values_roxzone.append(df[_constants.ROXZONE_LABELS[run_count]].mean())
             mean_values_station.append(0)
             run_count += 1
         else:
             mean_values_run.append(0)
             mean_values_roxzone.append(0)
-            mean_values_station.append(df[WORK_LABELS[station_count]].mean())
+            mean_values_station.append(df[_constants.WORK_LABELS[station_count]].mean())
             station_count += 1
     # mean_values_run = [df[col].mean() for col in RUN_LABELS]
     # mean_values_station = [df[col].mean() for col in WORK_LABELS]
@@ -220,8 +212,8 @@ def extract_mean_values_runs_stations(df):
     :param df:
     :return:
     """
-    mean_value_runs = [df[col].mean() for col in RUN_LABELS]
-    mean_value_stations = [df[col].mean() for col in WORK_LABELS]
+    mean_value_runs = [df[col].mean() for col in _constants.RUN_LABELS]
+    mean_value_stations = [df[col].mean() for col in _constants.WORK_LABELS]
     return mean_value_runs, mean_value_stations
 
 def extract_general_statistics(df):
@@ -273,7 +265,7 @@ def plot_distributions(df):
     for i, ax in enumerate(axs.flat):
         ax.hist(df[f'run_{i + 1}'], bins=10, color='blue', alpha=0.5, label=f'Run{i + 1}')
 
-        ax.hist(df[f'work_{i + 1}'], bins=10, color='red', alpha=0.5, label=STATIONS[i])
+        ax.hist(df[f'work_{i + 1}'], bins=10, color='red', alpha=0.5, label=_constants.STATIONS[i])
 
         ax.set_xlabel('Time (minutes)')
         ax.set_ylabel('Number of athletes')
@@ -308,7 +300,7 @@ def line_plot_runs(df):
 
 
 def random_forest_classifier(df, save_as_name):
-    X = df[RUN_LABELS + WORK_LABELS]
+    X = df[_constants.RUN_LABELS + _constants.WORK_LABELS]
     y = df['Top Percentage']
     random_state = 42
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
@@ -336,13 +328,13 @@ def random_forest_classifier(df, save_as_name):
 
 
 def analyse_rf_classifier(df, rf_classifier):
-    X = df[RUN_LABELS + WORK_LABELS]
+    X = df[_constants.RUN_LABELS + _constants.WORK_LABELS]
     y = df['Top Percentage']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=20)
     result = rf_classifier.score(X_test, y_test)
     y_pred = rf_classifier.predict(X_test)
     print(result)
-    feature_names = RUN_LABELS + STATIONS
+    feature_names = _constants.RUN_LABELS + _constants.STATIONS
     importances = pd.Series(rf_classifier.feature_importances_, index=feature_names)
     importances_sorted = importances.sort_values(ascending=False)
     plt.figure(figsize=(6, 6))
@@ -418,7 +410,7 @@ def f_importances(coef, names, top=-1):
 
 
 def get_correlation_matrix(df):
-    X = df[RUN_LABELS + WORK_LABELS + ['Top Percentage']]
+    X = df[_constants.RUN_LABELS + _constants.WORK_LABELS + ['Top Percentage']]
     # get the correlations of each fearures in dataset
     corrmat = X.corr()
     plt.figure(figsize=(10, 10))
