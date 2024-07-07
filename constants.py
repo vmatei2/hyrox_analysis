@@ -9,3 +9,6 @@ for i in range(1, 9):
     WORK_LABELS.append('work_' + str(i))
     RUN_LABELS.append('run_' + str(i))
     ROXZONE_LABELS.append('roxzone_' + str(i))
+
+# options used in user-display and then filtering the dataframe
+REQUEST_ALL_VALUES = 'all'

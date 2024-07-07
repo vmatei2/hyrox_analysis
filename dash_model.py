@@ -22,6 +22,12 @@ SIDEBAR_STYLE = {
     "width": "250px",
     "padding": "20px",
     "background-color": "#f8f9fa",
+    "overflow-y": "auto"
+}
+
+CONTENT_STYLE = {
+    "margin-left": "250px",
+    "padding": "20px"
 }
 
 # Sidebar layout
@@ -53,68 +59,69 @@ sidebar = html.Div(
 )
 
 # Application layout
-app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 
 app.layout = html.Div([
-    dbc.Row([
-        dbc.Col(
-            html.H2("Hyrox Results Analysis", style={
-                'textAlign': 'center',
-                'color': '#333',
-                'marginBottom': '40px'
-            })
-        )
-    ]),
-    dbc.Row([
-        dbc.Col(sidebar, width=3),
-        dbc.Col(html.Div(children=[
-            dcc.Loading(
-                id="loading-race-info",
-                type="circle",
-                children=html.Div(id='race-info', style={
-                    'textAlign': 'center',
-                    'marginTop': '20px'
-                })
-            ),
-            dcc.Loading(
-                id="loading-race-graph",
-                type="circle",
-                children=dcc.Graph(figure={}, id="race_graph")
-            ),
+    html.Div(sidebar),
+    html.Div(
+        [
             dbc.Row([
-                dbc.Col(dbc.Card(
-                    [
-                        dbc.CardHeader("This is the header"),
-                        dbc.CardBody([
-                            html.H4("Card title", className="card-title"),
-                            html.P("This is some card text", className="card-text")
-                        ])
-                    ]
-                ), width=4),
-                dbc.Col(dbc.Card(
-                    [
-                        dbc.CardHeader("This is the second header"),
-                        dbc.CardBody([
-                            html.H4("Card title", className="card-title"),
-                            html.P("This is some card text", className="card-text")
-                        ])
-                    ]
-                ), width=4),
-                dbc.Col(dbc.Card(
-                    [
-                        dbc.CardHeader("This is the third header"),
-                        dbc.CardBody([
-                            html.H4("Card title", className="card-title"),
-                            html.P("This is some card text", className="card-text")
-                        ])
-                    ]
-                ), width=4),
+                dbc.Col(
+                    html.H2("Hyrox Results Analysis", style={
+                        'textAlign': 'center',
+                        'color': '#333',
+                        'marginBottom': '40px'
+                    })
+                )
+            ]),
+            dbc.Row([
+                dbc.Col(
+                    dbc.Row([
+                        dbc.Col(dbc.Card(
+                            [
+                                dbc.CardHeader("Race Information"),
+                                dbc.CardBody([
+                                    html.P(className="card-title", id="race_name"),
+                                    html.P(className="card-text", id="participants")
+                                ])
+                            ]
+                        ), width=4),
+                        dbc.Col(dbc.Card(
+                            [
+                                dbc.CardHeader("Fastest Race Time"),
+                                dbc.CardBody([
+                                 html.P(className='card-text', id="fastest")
+                                ])
+                            ]
+                        ), width=4),
+                        dbc.Col(dbc.Card(
+                            [
+                                dbc.CardHeader("Average Race Time"),
+                                dbc.CardBody([
+                                    html.P(className="card-text", id="average")
+                                ])
+                            ]
+                        ), width=4),
+                    ]), width=12
+                )
+            ]),
+            dbc.Row([
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id="loading-race-graph",
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="race_graph")
+                        )
+                    ]), width=12
+                )
             ])
-        ]), width=9),
-    ]),
-    dcc.Store(id='race_df')
+        ],
+        style=CONTENT_STYLE
+    ),
+    dcc.Store(id='race_df'),
+    dcc.Store(id='filtered_df')
 ])
-
 
 # Callbacks
 @app.callback(Output('race_df', 'data'), Input('Race', 'value'))
@@ -129,6 +136,25 @@ def load_data(selected_race):
     except Exception as e:
         return pd.DataFrame().to_json()  # Return an empty DataFrame in case of an error
 
+@app.callback(Output('filtered_df', 'data'), [Input('race_df', 'data'), Input('Division', 'value'), Input('Gender', 'value')])
+def filter_df(race_df, division, gender):
+    """
+    Filter the race_df based on user selections
+    :return:
+    """
+    try:
+        race_df = pd.read_json(race_df)
+        # let's create the filter based on what the user has requested - first we create a filter that is always true - in case user has requested all values
+        # create a copy - more for debugging reasons as would like to keep the reference to the original one - can be optimised if causing issues in the future - small dataset so unlikely
+        filtered_df = race_df.copy()
+        if division != _constants.REQUEST_ALL_VALUES:
+            filtered_df = filtered_df[filtered_df['division'] == division]
+
+        if gender != _constants.REQUEST_ALL_VALUES:
+            filtered_df = filtered_df[filtered_df['gender'] == gender]
+        return filtered_df.to_json()
+    except Exception as e:
+        return pd.DataFrame().to_json()  # return an empty DataFrame in case of an error
 
 @app.callback(Output('Division', 'options'), Input('race_df', 'data'))
 def update_division_options(race_df):
@@ -141,7 +167,6 @@ def update_division_options(race_df):
     except Exception as e:
         return []
 
-
 @app.callback(Output('Gender', 'options'), Input('race_df', 'data'))
 def update_gender_options(race_df):
     """Update gender dropdown options based on the loaded race data."""
@@ -153,23 +178,22 @@ def update_gender_options(race_df):
     except Exception as e:
         return []
 
-
-@app.callback(Output('race-info', 'children'), [Input('race_df', 'data'), Input('Race', 'value')])
-def update_race_info(race_df, selected_race):
+@app.callback(Output('race_name', 'children'), Output('participants', 'children'), [Input('filtered_df', 'data'), Input('Race', 'value')])
+def update_race_info(filtered_df, selected_race):
     """Update race information based on the loaded race data."""
     try:
-        df = pd.read_json(race_df)
-        info_message = f"Race: {selected_race}, Number of entries: {len(df)}"
-        return info_message
+        filtered_df = pd.read_json(filtered_df)
+        race_name = selected_race
+        participants = f'Total Participants: {len(filtered_df)}'
+        return race_name, participants
     except Exception as e:
         return "Race: N/A, Number of entries: N/A"
 
-
-@app.callback(Output('race_graph', 'figure'), Input('race_df', 'data'))
-def update_graph(race_df):
+@app.callback(Output('race_graph', 'figure'), Input('filtered_df', 'data'))
+def update_graph(filtered_df):
     """Update race graph based on the loaded race data."""
     try:
-        df = pd.read_json(race_df)
+        df = pd.read_json(filtered_df)
         mean_value_runs, mean_value_stations = _hra.extract_mean_values_runs_stations(df)
         x_vals = np.arange(len(mean_value_runs))
         fig = go.Figure(
@@ -187,6 +211,23 @@ def update_graph(race_df):
     except Exception as e:
         return go.Figure()  # Return an empty figure in case of an error
 
+@app.callback(Output('fastest', 'children'), Output('average', 'children'), Input('filtered_df', 'data'))
+def update_card_displays(filtered_df):
+    """
+    Update the card display extracting the overall average time and the fastest time from the filtered_df
+    :param filtered_df:
+    :return:
+    """
+    try:
+        filtered_df = pd.read_json(filtered_df)
+        # get the first entry in the df given they have been sorted from fastest to slowest
+        fastest = round(filtered_df.head(1)['total_time'], 2).values[0]
+        fastest_text = f'{str(fastest)} minutes'
+        average = round(filtered_df['total_time'].mean(), 2)
+        average_text = f'{str(average)} minutes'
+        return fastest_text, average_text
+    except Exception as e:
+        return f"Exception caught when extracting fastest and average times from filtered df: {e}"
+
 if __name__ == '__main__':
-    print('running')
     app.run_server(debug=True)
