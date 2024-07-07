@@ -54,6 +54,13 @@ sidebar = html.Div(
             value='all',
             style={'width': '100%'}
         ),
+        html.P('Top percentile of athletes: '),
+
+        dcc.Slider(
+            0, 100, 10,
+            value=100,
+            id='top_percentile_slider'
+        )
     ],
     style=SIDEBAR_STYLE
 )
@@ -136,8 +143,8 @@ def load_data(selected_race):
     except Exception as e:
         return pd.DataFrame().to_json()  # Return an empty DataFrame in case of an error
 
-@app.callback(Output('filtered_df', 'data'), [Input('race_df', 'data'), Input('Division', 'value'), Input('Gender', 'value')])
-def filter_df(race_df, division, gender):
+@app.callback(Output('filtered_df', 'data'), [Input('race_df', 'data'), Input('Division', 'value'), Input('Gender', 'value'), Input('top_percentile_slider', 'value')])
+def filter_df(race_df, division, gender, top_percentile):
     """
     Filter the race_df based on user selections
     :return:
@@ -152,6 +159,7 @@ def filter_df(race_df, division, gender):
 
         if gender != _constants.REQUEST_ALL_VALUES:
             filtered_df = filtered_df[filtered_df['gender'] == gender]
+        filtered_df = filtered_df[(filtered_df['CDF'] * 100) <= top_percentile]
         return filtered_df.to_json()
     except Exception as e:
         return pd.DataFrame().to_json()  # return an empty DataFrame in case of an error
