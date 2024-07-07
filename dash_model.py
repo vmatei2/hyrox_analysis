@@ -84,31 +84,49 @@ app.layout = html.Div([
             dbc.Row([
                 dbc.Col(
                     dbc.Row([
-                        dbc.Col(dbc.Card(
-                            [
-                                dbc.CardHeader("Race Information"),
-                                dbc.CardBody([
-                                    html.P(className="card-title", id="race_name"),
-                                    html.P(className="card-text", id="participants")
-                                ])
-                            ]
-                        ), width=4),
-                        dbc.Col(dbc.Card(
-                            [
-                                dbc.CardHeader("Fastest Race Time"),
-                                dbc.CardBody([
-                                 html.P(className='card-text', id="fastest")
-                                ])
-                            ]
-                        ), width=4),
-                        dbc.Col(dbc.Card(
-                            [
-                                dbc.CardHeader("Average Race Time"),
-                                dbc.CardBody([
-                                    html.P(className="card-text", id="average")
-                                ])
-                            ]
-                        ), width=4),
+                        dbc.Col(
+                            dcc.Loading(
+                                id="loading-race-info",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Race Information"),
+                                        dbc.CardBody([
+                                            html.P(className="card-title", id="race_name"),
+                                            html.P(className="card-text", id="participants")
+                                        ])
+                                    ]
+                                )
+                            ), width=4
+                        ),
+                        dbc.Col(
+                            dcc.Loading(
+                                id="loading-fastest-time",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Fastest Race Time"),
+                                        dbc.CardBody([
+                                            html.P(className='card-text', id="fastest")
+                                        ])
+                                    ]
+                                )
+                            ), width=4
+                        ),
+                        dbc.Col(
+                            dcc.Loading(
+                                id="loading-average-time",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Average Race Time"),
+                                        dbc.CardBody([
+                                            html.P(className="card-text", id="average")
+                                        ])
+                                    ]
+                                )
+                            ), width=4
+                        ),
                     ]), width=12
                 )
             ]),
@@ -126,8 +144,16 @@ app.layout = html.Div([
         ],
         style=CONTENT_STYLE
     ),
-    dcc.Store(id='race_df'),
-    dcc.Store(id='filtered_df')
+    dcc.Loading(
+        id="loading-race-df",
+        type="circle",
+        children=dcc.Store(id='race_df')
+    ),
+    dcc.Loading(
+        id="loading-filtered-df",
+        type="circle",
+        children=dcc.Store(id='filtered_df')
+    )
 ])
 
 # Callbacks
