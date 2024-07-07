@@ -54,6 +54,7 @@ sidebar = html.Div(
 
 # Application layout
 app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
+
 app.layout = html.Div([
     dbc.Row([
         dbc.Col(
@@ -79,11 +80,41 @@ app.layout = html.Div([
                 id="loading-race-graph",
                 type="circle",
                 children=dcc.Graph(figure={}, id="race_graph")
-            )
-        ]), width=9)
+            ),
+            dbc.Row([
+                dbc.Col(dbc.Card(
+                    [
+                        dbc.CardHeader("This is the header"),
+                        dbc.CardBody([
+                            html.H4("Card title", className="card-title"),
+                            html.P("This is some card text", className="card-text")
+                        ])
+                    ]
+                ), width=4),
+                dbc.Col(dbc.Card(
+                    [
+                        dbc.CardHeader("This is the second header"),
+                        dbc.CardBody([
+                            html.H4("Card title", className="card-title"),
+                            html.P("This is some card text", className="card-text")
+                        ])
+                    ]
+                ), width=4),
+                dbc.Col(dbc.Card(
+                    [
+                        dbc.CardHeader("This is the third header"),
+                        dbc.CardBody([
+                            html.H4("Card title", className="card-title"),
+                            html.P("This is some card text", className="card-text")
+                        ])
+                    ]
+                ), width=4),
+            ])
+        ]), width=9),
     ]),
     dcc.Store(id='race_df')
 ])
+
 
 # Callbacks
 @app.callback(Output('race_df', 'data'), Input('Race', 'value'))
@@ -98,6 +129,7 @@ def load_data(selected_race):
     except Exception as e:
         return pd.DataFrame().to_json()  # Return an empty DataFrame in case of an error
 
+
 @app.callback(Output('Division', 'options'), Input('race_df', 'data'))
 def update_division_options(race_df):
     """Update division dropdown options based on the loaded race data."""
@@ -108,6 +140,7 @@ def update_division_options(race_df):
         return [{'label': division, 'value': division} for division in divisions]
     except Exception as e:
         return []
+
 
 @app.callback(Output('Gender', 'options'), Input('race_df', 'data'))
 def update_gender_options(race_df):
@@ -120,6 +153,7 @@ def update_gender_options(race_df):
     except Exception as e:
         return []
 
+
 @app.callback(Output('race-info', 'children'), [Input('race_df', 'data'), Input('Race', 'value')])
 def update_race_info(race_df, selected_race):
     """Update race information based on the loaded race data."""
@@ -129,6 +163,7 @@ def update_race_info(race_df, selected_race):
         return info_message
     except Exception as e:
         return "Race: N/A, Number of entries: N/A"
+
 
 @app.callback(Output('race_graph', 'figure'), Input('race_df', 'data'))
 def update_graph(race_df):
@@ -141,7 +176,8 @@ def update_graph(race_df):
             data=[
                 go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="markers+text",
                            textposition='top center'),
-                go.Scatter(x=x_vals, y=mean_value_stations, name='Stations', text=_constants.STATIONS, mode="markers+text",
+                go.Scatter(x=x_vals, y=mean_value_stations, name='Stations', text=_constants.STATIONS,
+                           mode="markers+text",
                            textposition='top center')
             ],
             layout={"xaxis": {"title": "Runs/Stations Numbers"}, "yaxis": {"title": "Time (Minutes)"},
@@ -152,4 +188,5 @@ def update_graph(race_df):
         return go.Figure()  # Return an empty figure in case of an error
 
 if __name__ == '__main__':
+    print('running')
     app.run_server(debug=True)
