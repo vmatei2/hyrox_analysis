@@ -1,7 +1,7 @@
 import dash
-from dash import dcc, html
+from dash import dcc, html, ctx
 import dash_bootstrap_components as dbc
-from dash.dependencies import Output, Input
+from dash.dependencies import Output, Input, State
 
 import plotly.graph_objects as go
 import numpy as np
@@ -62,24 +62,29 @@ sidebar = html.Div(
             id='top_percentile_slider'
         ),
 
-        html.P("Please Input Your Own Times For Plotting and Analysis:"),
+        html.P("Please Input Your Own Times For Plotting and Analysis: (Minutes:Seconds Format e.g. 4:05)"),
 
-        dbc.Input(placeholder='Run 1', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Ski Erg', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 2', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Sled Push', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 3', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Sled Pull', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 4', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Burpee Broad Jump', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 5', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Row Erg', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 6', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Farmers Carry', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 7', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Sandbag Lunges', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Run 8', size="sm", className='mt-2'),
-        dbc.Input(placeholder='Wall Balls', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 1', size="sm", className='mt-2', id=_constants.USER_RUN_1),
+        dbc.Input(placeholder='Ski Erg', size="sm", className='mt-2', id=_constants.USER_SKI_ERG),
+        dbc.Input(placeholder='Run 2', size="sm", className='mt-2', id=_constants.USER_RUN_2),
+        dbc.Input(placeholder='Sled Push', size="sm", className='mt-2', id=_constants.USER_SLED_PUSH),
+        dbc.Input(placeholder='Run 3', size="sm", className='mt-2', id=_constants.USER_RUN_3),
+        dbc.Input(placeholder='Sled Pull', size="sm", className='mt-2', id=_constants.USER_SLED_PULL),
+        dbc.Input(placeholder='Run 4', size="sm", className='mt-2', id=_constants.USER_RUN_4),
+        dbc.Input(placeholder='Burpee Broad Jump', size="sm", className='mt-2', id=_constants.USER_BURPEE_BROAD_JUMP),
+        dbc.Input(placeholder='Run 5', size="sm", className='mt-2', id=_constants.USER_RUN_5),
+        dbc.Input(placeholder='Row Erg', size="sm", className='mt-2', id=_constants.USER_ROW_ERG),
+        dbc.Input(placeholder='Run 6', size="sm", className='mt-2', id=_constants.USER_RUN_6),
+        dbc.Input(placeholder='Farmers Carry', size="sm", className='mt-2', id=_constants.USER_FARMERS_CARRY),
+        dbc.Input(placeholder='Run 7', size="sm", className='mt-2', id=_constants.USER_RUN_7),
+        dbc.Input(placeholder='Sandbag Lunges', size="sm", className='mt-2', id=_constants.USER_SANDBAG_LUNGES),
+        dbc.Input(placeholder='Run 8', size="sm", className='mt-2', id=_constants.USER_RUN_8),
+        dbc.Input(placeholder='Wall Balls', size="sm", className='mt-2', id=_constants.USER_WALL_BALLS),
+
+        #  Button for requesting to plot and analyse user Performance!
+        dbc.Button(
+            "Analyse my times", outline=True, id="analyse_button", color="info", className="mt-2", disabled=False
+        )
 
 
 
@@ -245,27 +250,47 @@ def update_race_info(filtered_df, selected_race):
     except Exception as e:
         return "Race: N/A, Number of entries: N/A"
 
-@app.callback(Output('race_graph', 'figure'), Input('filtered_df', 'data'))
-def update_graph(filtered_df):
+
+
+@app.callback(Output('race_graph', 'figure'),
+              Input('filtered_df', 'data'),
+              Input('analyse_button', 'n_clicks'),
+              [State(i, 'value') for i in _constants.ALL_USER_INPUTS])
+def update_graph(filtered_df, analyse_button, *values):
     """Update race graph based on the loaded race data."""
     try:
         df = pd.read_json(filtered_df)
         mean_value_runs, mean_value_stations = _hra.extract_mean_values_runs_stations(df)
-        x_vals = np.arange(len(mean_value_runs))
+        # start at 1 to avoid 0-indexing
+        x_vals = np.arange(start=1, stop=len(mean_value_runs))
         fig = go.Figure(
             data=[
-                go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="markers+text",
+                go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="lines+text",
                            textposition='top center'),
                 go.Scatter(x=x_vals, y=mean_value_stations, name='Stations', text=_constants.STATIONS,
-                           mode="markers+text",
+                           mode="lines+text",
                            textposition='top center')
             ],
             layout={"xaxis": {"title": "Runs/Stations Numbers"}, "yaxis": {"title": "Time (Minutes)"},
                     "title": "Average Times Analysis"}
         )
+
+        ctx_clicked = ctx.triggered_id
+        if ctx_clicked == "analyse_button":
+            print('clicked analyse button!')
+            # here please validate user input and ensure everything filled in and correct
+            # fig.add_trace(
+            #     go.Scatter(x=x_vals, y=user_runs, name='Your run times', text=_constants.RUN_LABELS, mode="lines+text",
+            #                textposition='top center')
+            # )
+
+
         return fig
     except Exception as e:
         return go.Figure()  # Return an empty figure in case of an error
+
+
+
 
 @app.callback(Output('fastest', 'children'), Output('average', 'children'), Input('filtered_df', 'data'))
 def update_card_displays(filtered_df):
@@ -284,6 +309,7 @@ def update_card_displays(filtered_df):
         return fastest_text, average_text
     except Exception as e:
         return f"Exception caught when extracting fastest and average times from filtered df: {e}"
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, port=8000)
