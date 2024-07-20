@@ -19,14 +19,14 @@ SIDEBAR_STYLE = {
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "250px",
-    "padding": "20px",
+    "width": "350px",
+    "padding": "10px",
     "background-color": "#f8f9fa",
     "overflow-y": "auto"
 }
 
 CONTENT_STYLE = {
-    "margin-left": "250px",
+    "margin-left": "350px",
     "padding": "20px"
 }
 
@@ -57,10 +57,32 @@ sidebar = html.Div(
         html.P('Top percentile of athletes: '),
 
         dcc.Slider(
-            0, 100, 10,
+            10, 100, 10,
             value=100,
             id='top_percentile_slider'
-        )
+        ),
+
+        html.P("Please Input Your Own Times For Plotting and Analysis:"),
+
+        dbc.Input(placeholder='Run 1', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Ski Erg', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 2', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Sled Push', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 3', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Sled Pull', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 4', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Burpee Broad Jump', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 5', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Row Erg', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 6', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Farmers Carry', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 7', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Sandbag Lunges', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Run 8', size="sm", className='mt-2'),
+        dbc.Input(placeholder='Wall Balls', size="sm", className='mt-2'),
+
+
+
     ],
     style=SIDEBAR_STYLE
 )
@@ -264,4 +286,4 @@ def update_card_displays(filtered_df):
         return f"Exception caught when extracting fastest and average times from filtered df: {e}"
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=8000)
