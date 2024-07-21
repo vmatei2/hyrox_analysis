@@ -83,10 +83,9 @@ sidebar = html.Div(
 
         #  Button for requesting to plot and analyse user Performance!
         dbc.Button(
-            "Analyse my times", outline=True, id="analyse_button", color="info", className="mt-2", disabled=False
-        )
-
-
+            "Analyse my times", outline=True, id="analyse_button", color="info", className="mt-2", disabled=True
+        ),
+        html.P("", id="fill_all_inputs")
 
     ],
     style=SIDEBAR_STYLE
@@ -167,7 +166,28 @@ app.layout = html.Div([
                         )
                     ]), width=12
                 )
-            ])
+            ]),
+            dbc.Row([
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id="loading-run-distribution-graph",
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="run_distribution_graph")
+                        )
+                    ]), width=6
+                ),
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id='loading-station-distribution-graph',
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="station_distribution_graph")
+                        )
+                    ])
+                )
+            ]),
+
         ],
         style=CONTENT_STYLE
     ),
@@ -183,7 +203,27 @@ app.layout = html.Div([
     )
 ])
 
+
 # Callbacks
+
+@app.callback(
+    [Output("fill_all_inputs", "children"), Output("fill_all_inputs", "style"), Output("analyse_button", 'disabled')],
+    [Input(i, 'value') for i in _constants.ALL_USER_INPUTS],
+
+)
+def toggle_button(*values):
+    """
+    Function to toggle analyse my times button on if all values to be passed by user are filled in
+    :param values:
+    :param is_open:
+    :return:
+    """
+    if all(values):
+        return "", {"display": "none"}, False
+    else:
+        return "Pleaes fill in all inputs", {"display": "block", "color": "red"}, True
+
+
 @app.callback(Output('race_df', 'data'), Input('Race', 'value'))
 def load_data(selected_race):
     """Load race data based on the selected race."""
@@ -196,7 +236,10 @@ def load_data(selected_race):
     except Exception as e:
         return pd.DataFrame().to_json()  # Return an empty DataFrame in case of an error
 
-@app.callback(Output('filtered_df', 'data'), [Input('race_df', 'data'), Input('Division', 'value'), Input('Gender', 'value'), Input('top_percentile_slider', 'value')])
+
+@app.callback(Output('filtered_df', 'data'),
+              [Input('race_df', 'data'), Input('Division', 'value'), Input('Gender', 'value'),
+               Input('top_percentile_slider', 'value')])
 def filter_df(race_df, division, gender, top_percentile):
     """
     Filter the race_df based on user selections
@@ -217,6 +260,7 @@ def filter_df(race_df, division, gender, top_percentile):
     except Exception as e:
         return pd.DataFrame().to_json()  # return an empty DataFrame in case of an error
 
+
 @app.callback(Output('Division', 'options'), Input('race_df', 'data'))
 def update_division_options(race_df):
     """Update division dropdown options based on the loaded race data."""
@@ -227,6 +271,7 @@ def update_division_options(race_df):
         return [{'label': division, 'value': division} for division in divisions]
     except Exception as e:
         return []
+
 
 @app.callback(Output('Gender', 'options'), Input('race_df', 'data'))
 def update_gender_options(race_df):
@@ -239,7 +284,9 @@ def update_gender_options(race_df):
     except Exception as e:
         return []
 
-@app.callback(Output('race_name', 'children'), Output('participants', 'children'), [Input('filtered_df', 'data'), Input('Race', 'value')])
+
+@app.callback(Output('race_name', 'children'), Output('participants', 'children'),
+              [Input('filtered_df', 'data'), Input('Race', 'value')])
 def update_race_info(filtered_df, selected_race):
     """Update race information based on the loaded race data."""
     try:
@@ -249,7 +296,6 @@ def update_race_info(filtered_df, selected_race):
         return race_name, participants
     except Exception as e:
         return "Race: N/A, Number of entries: N/A"
-
 
 
 @app.callback(Output('race_graph', 'figure'),
@@ -262,7 +308,7 @@ def update_graph(filtered_df, analyse_button, *values):
         df = pd.read_json(filtered_df)
         mean_value_runs, mean_value_stations = _hra.extract_mean_values_runs_stations(df)
         # start at 1 to avoid 0-indexing
-        x_vals = np.arange(start=1, stop=len(mean_value_runs))
+        x_vals = np.arange(start=1, stop=len(mean_value_runs) + 1)
         fig = go.Figure(
             data=[
                 go.Scatter(x=x_vals, y=mean_value_runs, name='Runs', text=_constants.RUN_LABELS, mode="lines+text",
@@ -279,17 +325,76 @@ def update_graph(filtered_df, analyse_button, *values):
         if ctx_clicked == "analyse_button":
             print('clicked analyse button!')
             # here please validate user input and ensure everything filled in and correct
-            # fig.add_trace(
-            #     go.Scatter(x=x_vals, y=user_runs, name='Your run times', text=_constants.RUN_LABELS, mode="lines+text",
-            #                textposition='top center')
-            # )
-
-
+            # let's extract the user's runs
+            user_runs, user_stations = _extract_runs_stations(values)
+            # we have one entry that is a run, one that is a station - i.e values[0] = run_1, values[2] = run_2, values[1] = ski_erg, values[3] = sled_push etc..
+            user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
+            user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
+            fig.add_trace(
+                go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
+                           textposition='top center')
+            )
+            fig.add_trace(
+                go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text",
+                           textposition='top center')
+            )
         return fig
     except Exception as e:
         return go.Figure()  # Return an empty figure in case of an error
 
 
+@app.callback(Output('run_distribution_graph', 'figure'),
+              Output('station_distribution_graph', 'figure'),
+              Input('filtered_df', 'data'),
+              Input('analyse_button', 'n_clicks'),
+              [State(i, 'value') for i in _constants.ALL_USER_INPUTS])
+def update_distribution_graphs(filtered_df, n_clicks, *values):
+    try:
+        df = pd.read_json(filtered_df)
+        run_distribution_fig = go.Figure()
+        station_distribution_fig = go.Figure()
+        run_data_points = []
+        station_data_points = []
+
+        for column_name in _constants.RUN_LABELS:
+            run_data_points.append(df[column_name])
+        run_data_points = [sorted(entry) for entry in run_data_points]
+        for i, data in enumerate(run_data_points):
+            run_distribution_fig.add_trace(go.Scatter(
+                x=[i] * len(data),
+                y=data,
+                mode='markers',
+                name=f'Lap {i + 1}'
+            ))
+
+        run_xlabels = _constants.RUN_LABELS
+        run_distribution_fig.update_layout(
+            xaxis=dict(
+                tickvals=list(range(len(run_data_points))),
+                ticktext=run_xlabels
+            ),
+            xaxis_title='Laps',
+            yaxis_title='Time (minutes)',
+            title='Lap Times Scatter Plot',
+            legend_title='Legend'
+        )
+        #  we have 8 runs
+        ctx_clicked = ctx.triggered_id
+        if ctx_clicked == "analyse_button":
+            user_runs, user_stations = _extract_runs_stations(values)
+            user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
+            user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
+
+            x_vals = [i for i in range(8)]
+            run_distribution_fig.add_trace(
+                (
+                    go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
+                               textposition='top center')
+                )
+            )
+        return run_distribution_fig, station_distribution_fig
+    except Exception as e:
+        return go.Figure(), go.Figure()  # Return an empty figure in case of an error
 
 
 @app.callback(Output('fastest', 'children'), Output('average', 'children'), Input('filtered_df', 'data'))
@@ -309,6 +414,18 @@ def update_card_displays(filtered_df):
         return fastest_text, average_text
     except Exception as e:
         return f"Exception caught when extracting fastest and average times from filtered df: {e}"
+
+
+####  PRIVATE API ####
+def _extract_runs_stations(values):
+    user_runs = []
+    user_stations = []
+    for i, entry in enumerate(values):
+        if i % 2 == 0:
+            user_runs.append(entry)
+        else:
+            user_stations.append(entry)
+    return user_runs, user_stations
 
 
 if __name__ == '__main__':
