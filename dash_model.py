@@ -12,7 +12,7 @@ import constants as _constants
 import helpers as _helpers
 
 # Constants and styles
-DATA_PATH = "/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData"
+DATA_PATH = "assets/hyroxData"
 all_race_names = _dlh.list_files_in_directory(DATA_PATH)
 
 SIDEBAR_STYLE = {
