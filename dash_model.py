@@ -94,6 +94,7 @@ sidebar = html.Div(
 
 # Application layout
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
+server = app.server
 
 app.layout = html.Div([
     html.Div(sidebar),

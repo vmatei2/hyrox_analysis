@@ -98,3 +98,4 @@ xz=5.4.5=h6c40b1e_0
 zipp=3.17.0=py310hecd8cb5_0
 zlib=1.2.13=h4dc903c_0
 zstd=1.5.5=hc035e20_0
+gunicorn
