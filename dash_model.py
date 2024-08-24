@@ -2,7 +2,7 @@ import dash
 from dash import dcc, html, ctx
 import dash_bootstrap_components as dbc
 from dash.dependencies import Output, Input, State
-
+import re
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
@@ -100,6 +100,17 @@ app.layout = html.Div([
     html.Div(sidebar),
     html.Div(
         [
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
+                    dbc.ModalBody("Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
+                    dbc.ModalFooter(
+                        dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
+                    )
+                ],
+                id="modal",
+                is_open=False
+            ),
             dbc.Row([
                 dbc.Col(
                     html.H2("Hyrox Results Analysis", style={
@@ -301,9 +312,11 @@ def update_race_info(filtered_df, selected_race):
 
 
 @app.callback(Output('race_graph', 'figure'),
+              Output("modal", "is_open"),
               Input('filtered_df', 'data'),
               Input('analyse_button', 'n_clicks'),
-              [State(i, 'value') for i in _constants.ALL_USER_INPUTS])
+              [State(i, 'value') for i in _constants.ALL_USER_INPUTS],
+              State("modal", "is_open"))
 def update_graph(filtered_df, analyse_button, *values):
     """Update race graph based on the loaded race data."""
     try:
@@ -324,25 +337,28 @@ def update_graph(filtered_df, analyse_button, *values):
         )
 
         ctx_clicked = ctx.triggered_id
+        modal_open = False
         if ctx_clicked == "analyse_button":
-            print('clicked analyse button!')
-            # here please validate user input and ensure everything filled in and correct
-            # let's extract the user's runs
-            user_runs, user_stations = _extract_runs_stations(values)
-            # we have one entry that is a run, one that is a station - i.e values[0] = run_1, values[2] = run_2, values[1] = ski_erg, values[3] = sled_push etc..
-            user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
-            user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
-            fig.add_trace(
-                go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
-                           textposition='top center')
-            )
-            fig.add_trace(
-                go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text",
-                           textposition='top center')
-            )
-        return fig
+            if _validate_time_format(values):
+                # here please validate user input and ensure everything filled in and correct
+                # let's extract the user's runs
+                user_runs, user_stations = _extract_runs_stations(values)
+                # we have one entry that is a run, one that is a station - i.e values[0] = run_1, values[2] = run_2, values[1] = ski_erg, values[3] = sled_push etc..
+                user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
+                user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
+                fig.add_trace(
+                    go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
+                               textposition='top center')
+                )
+                fig.add_trace(
+                    go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text",
+                               textposition='top center'))
+            else:
+                modal_open = True
+
+        return fig, modal_open
     except Exception as e:
-        return go.Figure()  # Return an empty figure in case of an error
+        return go.Figure() , modal_open # Return an empty figure in case of an error
 
 
 @app.callback(Output('run_distribution_graph', 'figure'),
@@ -371,23 +387,27 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
         )
         ctx_clicked = ctx.triggered_id
         if ctx_clicked == "analyse_button":
-            user_runs, user_stations = _extract_runs_stations(values)
-            user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
-            user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
+            if _validate_time_format(time_list=values):
+                user_runs, user_stations = _extract_runs_stations(values)
+                user_runs = _hra.convert_string_times_to_model_inputs(user_runs)
+                user_stations = _hra.convert_string_times_to_model_inputs(user_stations)
 
-            x_vals = [i for i in range(8)]
-            run_distribution_fig.add_trace(
-                (
-                    go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
-                               textposition='top center')
+                x_vals = [i for i in range(8)]
+                run_distribution_fig.add_trace(
+                    (
+                        go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
+                                   textposition='top center')
+                    )
                 )
-            )
-            station_distribution_fig.add_trace(
-                (
-                    go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text", textposition='top center')
+                station_distribution_fig.add_trace(
+                    (
+                        go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text", textposition='top center')
+                    )
                 )
-            )
-        return run_distribution_fig, station_distribution_fig
+                return run_distribution_fig, station_distribution_fig
+        else:
+            return run_distribution_fig, station_distribution_fig
+
     except Exception as e:
         return go.Figure(), go.Figure()  # Return an empty figure in case of an error
 
@@ -421,6 +441,17 @@ def _extract_runs_stations(values):
         else:
             user_stations.append(entry)
     return user_runs, user_stations
+
+def _validate_time_format(time_list):
+    # Define a regex pattern for "minutes:seconds"
+    pattern = re.compile(r'^\d+:[0-5]\d$')
+
+    # Iterate through each time string in the list
+    for time_str in time_list:
+        # Check if the string matches the pattern
+        if not pattern.match(time_str):
+            return False  # Return False if any string does not match
+    return True  # Return True if all strings are valid
 
 
 if __name__ == '__main__':
