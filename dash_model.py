@@ -9,6 +9,7 @@ import pandas as pd
 import hyrox_results_analysis as _hra
 import data_loading_helpers as _dlh
 import constants as _constants
+import helpers as _helpers
 
 # Constants and styles
 DATA_PATH = "/Users/vladmatei/VS_code_files/hyrox_analysis/assets/hyroxData"
@@ -351,8 +352,6 @@ def update_graph(filtered_df, analyse_button, *values):
 def update_distribution_graphs(filtered_df, n_clicks, *values):
     try:
         df = pd.read_json(filtered_df)
-        run_distribution_fig = go.Figure()
-        station_distribution_fig = go.Figure()
         run_data_points = []
         station_data_points = []
 
@@ -361,44 +360,14 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
             station_data_points.append(df[_constants.WORK_LABELS[i]])
         run_data_points = [sorted(entry) for entry in run_data_points]
         station_data_points = [sorted(entry) for entry in station_data_points]
-        for i, data in enumerate(run_data_points):
-            run_distribution_fig.add_trace(go.Scatter(
-                x=[i] * len(data),
-                y=data,
-                mode='markers',
-                name=f'Lap {i + 1}'
-            ))
-        for i, data in enumerate(station_data_points):
-            station_distribution_fig.add_trace(go.Scatter(
-                x=[i] * len(data),
-                y=data,
-                mode='markers',
-                name=f'Station {i + 1}'
-            ))
 
-        run_xlabels = _constants.RUN_LABELS
-        station_xlabels = _constants.STATIONS
-        run_distribution_fig.update_layout(
-            xaxis=dict(
-                tickvals=list(range(len(run_data_points))),
-                ticktext=run_xlabels
-            ),
-            xaxis_title='Laps',
-            yaxis_title='Time (minutes)',
-            title='Lap Times Scatter Plot',
-            legend_title='Legend'
+                # Create distribution figures using the helper function
+        run_distribution_fig = _helpers.create_distribution_figure(
+            run_data_points, _constants.RUN_LABELS, 'Laps', 'Time (minutes)', 'Lap Times Scatter Plot'
         )
-        station_distribution_fig.update_layout(
-            xaxis=dict(
-                tickvals=list(range(len(station_data_points))),
-                ticktext=station_xlabels
-            ),
-            xaxis_title='Stations',
-            yaxis_title='Time (minutes)',
-            title='Station Times Scatter Plot',
-            legend_title='Legend'
+        station_distribution_fig = _helpers.create_distribution_figure(
+            station_data_points, _constants.STATIONS, 'Stations', 'Time (minutes)', 'Station Times Scatter Plot'
         )
-        #  we have 8 runs
         ctx_clicked = ctx.triggered_id
         if ctx_clicked == "analyse_button":
             user_runs, user_stations = _extract_runs_stations(values)
