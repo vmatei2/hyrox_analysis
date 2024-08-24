@@ -356,9 +356,11 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
         run_data_points = []
         station_data_points = []
 
-        for column_name in _constants.RUN_LABELS:
+        for i, column_name in enumerate(_constants.RUN_LABELS):
             run_data_points.append(df[column_name])
+            station_data_points.append(df[_constants.WORK_LABELS[i]])
         run_data_points = [sorted(entry) for entry in run_data_points]
+        station_data_points = [sorted(entry) for entry in station_data_points]
         for i, data in enumerate(run_data_points):
             run_distribution_fig.add_trace(go.Scatter(
                 x=[i] * len(data),
@@ -366,8 +368,16 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
                 mode='markers',
                 name=f'Lap {i + 1}'
             ))
+        for i, data in enumerate(station_data_points):
+            station_distribution_fig.add_trace(go.Scatter(
+                x=[i] * len(data),
+                y=data,
+                mode='markers',
+                name=f'Station {i + 1}'
+            ))
 
         run_xlabels = _constants.RUN_LABELS
+        station_xlabels = _constants.STATIONS
         run_distribution_fig.update_layout(
             xaxis=dict(
                 tickvals=list(range(len(run_data_points))),
@@ -376,6 +386,16 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
             xaxis_title='Laps',
             yaxis_title='Time (minutes)',
             title='Lap Times Scatter Plot',
+            legend_title='Legend'
+        )
+        station_distribution_fig.update_layout(
+            xaxis=dict(
+                tickvals=list(range(len(station_data_points))),
+                ticktext=station_xlabels
+            ),
+            xaxis_title='Stations',
+            yaxis_title='Time (minutes)',
+            title='Station Times Scatter Plot',
             legend_title='Legend'
         )
         #  we have 8 runs
@@ -390,6 +410,11 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
                 (
                     go.Scatter(x=x_vals, y=user_runs, name='Your run times', mode="lines+text",
                                textposition='top center')
+                )
+            )
+            station_distribution_fig.add_trace(
+                (
+                    go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text", textposition='top center')
                 )
             )
         return run_distribution_fig, station_distribution_fig
