@@ -27,7 +27,7 @@ mkl-random==1.2.4
 munkres==1.1.4
 nest-asyncio==1.6.0
 numexpr==2.8.7
-numpy==1.26.2
+numpy==1.26.5
 packaging==23.2
 pandas==2.1.4
 patsy==0.5.3
