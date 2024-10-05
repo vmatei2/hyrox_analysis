@@ -23,7 +23,10 @@ SIDEBAR_STYLE = {
     "width": "350px",
     "padding": "10px",
     "background-color": "#f8f9fa",
-    "overflow-y": "auto"
+    "overflow-y": "auto",
+    "width": "15%",
+    "display": "inline-block",
+    "vertical-algin": "top"
 }
 
 CONTENT_STYLE = {
@@ -56,15 +59,12 @@ sidebar = html.Div(
             style={'width': '100%'}
         ),
         html.P('Top percentile of athletes: '),
-
         dcc.Slider(
             10, 100, 10,
             value=100,
             id='top_percentile_slider'
         ),
-
         html.P("Please Input Your Own Times For Plotting and Analysis: (Minutes:Seconds Format e.g. 4:05)"),
-
         dbc.Input(placeholder='Run 1', size="sm", className='mt-2', id=_constants.USER_RUN_1),
         dbc.Input(placeholder='Ski Erg', size="sm", className='mt-2', id=_constants.USER_SKI_ERG),
         dbc.Input(placeholder='Run 2', size="sm", className='mt-2', id=_constants.USER_RUN_2),
@@ -82,140 +82,143 @@ sidebar = html.Div(
         dbc.Input(placeholder='Run 8', size="sm", className='mt-2', id=_constants.USER_RUN_8),
         dbc.Input(placeholder='Wall Balls', size="sm", className='mt-2', id=_constants.USER_WALL_BALLS),
 
-        #  Button for requesting to plot and analyse user Performance!
         dbc.Button(
             "Analyse my times", outline=True, id="analyse_button", color="info", className="mt-2", disabled=True
         ),
         html.P("", id="fill_all_inputs")
-
     ],
     style=SIDEBAR_STYLE
 )
 
-# Application layout
+# Tabs Layout
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 server = app.server
 
 app.layout = html.Div([
-    html.Div(sidebar),
-    html.Div(
-        [
-            dbc.Modal(
+    dcc.Tabs([
+        dcc.Tab(label='Times Distribution and Average Results', children=[
+            html.Div(sidebar),
+            html.Div(
                 [
-                    dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
-                    dbc.ModalBody("Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
-                    dbc.ModalFooter(
-                        dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
-                    )
-                ],
-                id="modal",
-                is_open=False
-            ),
-            dbc.Row([
-                dbc.Col(
-                    html.H2("Hyrox Results Analysis", style={
-                        'textAlign': 'center',
-                        'color': '#333',
-                        'marginBottom': '40px'
-                    })
-                )
-            ]),
-            dbc.Row([
-                dbc.Col(
+                    dbc.Modal(
+                        [
+                            dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
+                            dbc.ModalBody("Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
+                            dbc.ModalFooter(
+                                dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
+                            )
+                        ],
+                        id="modal",
+                        is_open=False
+                    ),
                     dbc.Row([
                         dbc.Col(
-                            dcc.Loading(
-                                id="loading-race-info",
-                                type="circle",
-                                children=dbc.Card(
-                                    [
-                                        dbc.CardHeader("Race Information"),
-                                        dbc.CardBody([
-                                            html.P(className="card-title", id="race_name"),
-                                            html.P(className="card-text", id="participants")
-                                        ])
-                                    ]
+                            html.H2("Hyrox Results Analysis", style={
+                                'textAlign': 'center',
+                                'color': '#333',
+                                'marginBottom': '40px'
+                            })
+                        )
+                    ]),
+                    dbc.Row([
+                        dbc.Col(
+                            dbc.Row([
+                                dbc.Col(
+                                    dcc.Loading(
+                                        id="loading-race-info",
+                                        type="circle",
+                                        children=dbc.Card(
+                                            [
+                                                dbc.CardHeader("Race Information"),
+                                                dbc.CardBody([
+                                                    html.P(className="card-title", id="race_name"),
+                                                    html.P(className="card-text", id="participants")
+                                                ])
+                                            ]
+                                        )
+                                    ), width=4
+                                ),
+                                dbc.Col(
+                                    dcc.Loading(
+                                        id="loading-fastest-time",
+                                        type="circle",
+                                        children=dbc.Card(
+                                            [
+                                                dbc.CardHeader("Fastest Race Time"),
+                                                dbc.CardBody([
+                                                    html.P(className='card-text', id="fastest")
+                                                ])
+                                            ]
+                                        )
+                                    ), width=4
+                                ),
+                                dbc.Col(
+                                    dcc.Loading(
+                                        id="loading-average-time",
+                                        type="circle",
+                                        children=dbc.Card(
+                                            [
+                                                dbc.CardHeader("Average Race Time"),
+                                                dbc.CardBody([
+                                                    html.P(className="card-text", id="average")
+                                                ])
+                                            ]
+                                        )
+                                    ), width=4
+                                ),
+                            ]), width=12
+                        )
+                    ]),
+                    dbc.Row([
+                        dbc.Col(
+                            html.Div(children=[
+                                dcc.Loading(
+                                    id="loading-race-graph",
+                                    type="circle",
+                                    children=dcc.Graph(figure={}, id="race_graph")
                                 )
-                            ), width=4
+                            ]), width=12
+                        )
+                    ]),
+                    dbc.Row([
+                        dbc.Col(
+                            html.Div(children=[
+                                dcc.Loading(
+                                    id="loading-run-distribution-graph",
+                                    type="circle",
+                                    children=dcc.Graph(figure={}, id="run_distribution_graph")
+                                )
+                            ]), width=6
                         ),
                         dbc.Col(
-                            dcc.Loading(
-                                id="loading-fastest-time",
-                                type="circle",
-                                children=dbc.Card(
-                                    [
-                                        dbc.CardHeader("Fastest Race Time"),
-                                        dbc.CardBody([
-                                            html.P(className='card-text', id="fastest")
-                                        ])
-                                    ]
+                            html.Div(children=[
+                                dcc.Loading(
+                                    id='loading-station-distribution-graph',
+                                    type="circle",
+                                    children=dcc.Graph(figure={}, id="station_distribution_graph")
                                 )
-                            ), width=4
-                        ),
-                        dbc.Col(
-                            dcc.Loading(
-                                id="loading-average-time",
-                                type="circle",
-                                children=dbc.Card(
-                                    [
-                                        dbc.CardHeader("Average Race Time"),
-                                        dbc.CardBody([
-                                            html.P(className="card-text", id="average")
-                                        ])
-                                    ]
-                                )
-                            ), width=4
-                        ),
-                    ]), width=12
-                )
-            ]),
-            dbc.Row([
-                dbc.Col(
-                    html.Div(children=[
-                        dcc.Loading(
-                            id="loading-race-graph",
-                            type="circle",
-                            children=dcc.Graph(figure={}, id="race_graph")
+                            ])
                         )
-                    ]), width=12
-                )
-            ]),
-            dbc.Row([
-                dbc.Col(
-                    html.Div(children=[
-                        dcc.Loading(
-                            id="loading-run-distribution-graph",
-                            type="circle",
-                            children=dcc.Graph(figure={}, id="run_distribution_graph")
-                        )
-                    ]), width=6
-                ),
-                dbc.Col(
-                    html.Div(children=[
-                        dcc.Loading(
-                            id='loading-station-distribution-graph',
-                            type="circle",
-                            children=dcc.Graph(figure={}, id="station_distribution_graph")
-                        )
-                    ])
-                )
-            ]),
-
-        ],
-        style=CONTENT_STYLE
-    ),
-    dcc.Loading(
-        id="loading-race-df",
-        type="circle",
-        children=dcc.Store(id='race_df')
-    ),
-    dcc.Loading(
-        id="loading-filtered-df",
-        type="circle",
-        children=dcc.Store(id='filtered_df')
-    )
+                    ]),
+                ],
+                style=CONTENT_STYLE
+            ),
+            dcc.Loading(
+                id="loading-race-df",
+                type="circle",
+                children=dcc.Store(id='race_df')
+            ),
+            dcc.Loading(
+                id="loading-filtered-df",
+                type="circle",
+                children=dcc.Store(id='filtered_df')
+            )
+        ]),
+        dcc.Tab(label='AI-Prediction', children=[
+            html.H3('This is your second tab')
+        ])
+    ])
 ])
-
 
 # Callbacks
 
