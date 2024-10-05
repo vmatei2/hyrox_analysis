@@ -339,6 +339,7 @@ def update_graph(filtered_df, analyse_button, *values):
         ctx_clicked = ctx.triggered_id
         modal_open = False
         if ctx_clicked == "analyse_button":
+            values = [entry for entry in values if type(entry) == str]
             if _validate_time_format(values):
                 # here please validate user input and ensure everything filled in and correct
                 # let's extract the user's runs
