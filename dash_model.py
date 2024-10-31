@@ -15,20 +15,6 @@ import helpers as _helpers
 DATA_PATH = "assets/hyroxData"
 all_race_names = _dlh.list_files_in_directory(DATA_PATH)
 
-def ai_tab_layout():
-    tab_layout = html.Div([
-        html.H3('This is your second tab!'),
-        dbc.Card(
-            [
-                dbc.CardHeader('Testing'),
-                dbc.CardBody([
-                    html.P(className="card-text", id="run_1"),
-                    html.P(className="card-text", id="burpees")
-                ])
-            ]
-        )])
-
-    return tab_layout
 
 
 SIDEBAR_STYLE = {
@@ -42,7 +28,7 @@ SIDEBAR_STYLE = {
     "overflow-y": "auto",
     "width": "15%",
     "display": "inline-block",
-    "vertical-algin": "top"
+    "vertical-align": "top"
 }
 
 CONTENT_STYLE = {
@@ -103,7 +89,8 @@ sidebar = html.Div(
         ),
         html.P("", id="fill_all_inputs")
     ],
-    style=SIDEBAR_STYLE
+    style=SIDEBAR_STYLE,
+    id='sidebar'  # assigning id for CSS targeting
 )
 
 # Tabs Layout
@@ -111,15 +98,14 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 server = app.server
 
 app.layout = html.Div([
-    dcc.Tabs([
-        dcc.Tab(label='Times Distribution and Average Results', children=[
             html.Div(sidebar),
             html.Div(
                 [
                     dbc.Modal(
                         [
                             dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
-                            dbc.ModalBody("Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
+                            dbc.ModalBody(
+                                "Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
                             dbc.ModalFooter(
                                 dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
                             )
@@ -229,12 +215,7 @@ app.layout = html.Div([
                 type="circle",
                 children=dcc.Store(id='filtered_df')
             )
-        ]),
-        dcc.Tab(label='AI-Prediction', children=[
-            ai_tab_layout()
         ])
-    ])
-])
 
 # Callbacks
 
@@ -378,7 +359,7 @@ def update_graph(filtered_df, analyse_button, *values):
 
         return fig, modal_open
     except Exception as e:
-        return go.Figure() , modal_open # Return an empty figure in case of an error
+        return go.Figure(), modal_open  # Return an empty figure in case of an error
 
 
 @app.callback(Output('run_distribution_graph', 'figure'),
@@ -398,7 +379,7 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
         run_data_points = [sorted(entry) for entry in run_data_points]
         station_data_points = [sorted(entry) for entry in station_data_points]
 
-                # Create distribution figures using the helper function
+        # Create distribution figures using the helper function
         run_distribution_fig = _helpers.create_distribution_figure(
             run_data_points, _constants.RUN_LABELS, 'Laps', 'Time (minutes)', 'Lap Times Scatter Plot'
         )
@@ -421,7 +402,8 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
                 )
                 station_distribution_fig.add_trace(
                     (
-                        go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text", textposition='top center')
+                        go.Scatter(x=x_vals, y=user_stations, name='Your station times', mode="lines+text",
+                                   textposition='top center')
                     )
                 )
                 return run_distribution_fig, station_distribution_fig
@@ -450,23 +432,6 @@ def update_card_displays(filtered_df):
     except Exception as e:
         return f"Exception caught when extracting fastest and average times from filtered df: {e}"
 
-@app.callback(Output('run_1', 'children'), Output('burpees', 'children'),
-             Input('analyse_button', 'n_clicks'),
-            [State(i, 'value') for i in _constants.ALL_USER_INPUTS])
-def update_user_values(*values):
-
-    ctx_clicked = ctx.triggered_id
-    if ctx_clicked == "analyse_button":
-        # drop first element, given that we are passing *values, and first one is the n_clicks
-        values = values[1:]
-        user_runs, user_stations = _extract_runs_stations(values)
-        run_1_value = user_runs[0]
-        burpees = user_stations[3]
-        run_1_text = f'Run 1 Time: {run_1_value}'
-        burpee_text = f'Burpees Time: {burpees}'
-        return run_1_text, burpee_text
-    return  "", ""
-
 
 
 ####  PRIVATE API ####
@@ -480,6 +445,7 @@ def _extract_runs_stations(values):
             user_stations.append(entry)
     return user_runs, user_stations
 
+
 def _validate_time_format(time_list):
     # Define a regex pattern for "minutes:seconds"
     pattern = re.compile(r'^\d+:[0-5]\d$')
@@ -490,7 +456,6 @@ def _validate_time_format(time_list):
         if not pattern.match(time_str):
             return False  # Return False if any string does not match
     return True  # Return True if all strings are valid
-
 
 
 if __name__ == '__main__':

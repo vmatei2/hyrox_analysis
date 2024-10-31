@@ -1,0 +1,54 @@
+/* Sidebar style */
+.sidebar {
+    background-color: #1a1a2e; /* Dark blue */
+    color: #f0f0f0; /* Light text for better visibility */
+    padding: 200px;
+    font-family: Arial, sans-serif;
+    height: 100vh; /* Ensure it takes full height */
+    overflow-y: auto; /* Allow scrolling if content overflows */
+}
+
+/* Title style */
+.sidebar h2 {
+    color: #e94560; /* A vibrant color to make the title stand out */
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid #e94560;
+    padding-bottom: 10px;
+}
+
+/* General sidebar text styling */
+.sidebar p, .sidebar label, .sidebar a {
+    color: #f0f0f0; /* Light color for all text */
+    font-size: 14px;
+}
+
+/* Adjusting sidebar input fields */
+.sidebar input[type="text"], .sidebar select {
+    backgroundColor: #333;
+    color: #f0f0f0;
+    border: 1px solid #555;
+    padding: 8px;
+    border-radius: 5px;
+    width: calc(100% - 16px); /* Full width minus padding */
+    margin-bottom: 10px; /* Spacing between inputs */
+}
+
+/* Enhancing button style */
+.sidebar button {
+    backgroundColor: #e94560;
+    color: #f0f0f0;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: backgroundColor 0.3s; /* Smooth transition */
+}
+
+.sidebar button:hover {
+    backgroundColor: #f06d91;
+}
