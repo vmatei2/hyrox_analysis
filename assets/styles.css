@@ -80,3 +80,25 @@ h2 {
     background-color: #f0f0f0; /* Light grey for modals */
     color: #333333; /* Dark grey text in modals */
 }
+
+@media (min-width: 768px) {
+    #sidebar {
+        width: 15%;
+    }
+    .content {
+        margin-left: 15%;
+    }
+}
+
+@media (max-width: 767px) {
+    #sidebar {
+        position: relative;
+        width: 100%;
+    }
+    .content {
+        margin-left: 0;
+    }
+    .content h2, .content .card {
+        font-size: smaller;
+    }
+}

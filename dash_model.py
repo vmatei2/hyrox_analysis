@@ -21,7 +21,7 @@ SIDEBAR_STYLE = {
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "350px",
+    "max-width": "350px",  # Limit sidebar width on larger screens
     "padding": "10px",
     "background-color": "#f8f9fa",
     "overflow-y": "auto",
@@ -31,8 +31,8 @@ SIDEBAR_STYLE = {
 }
 
 CONTENT_STYLE = {
-    "margin-left": "350px",
-    "padding": "20px"
+    "margin-left": "20%",
+    "padding": "0%"
 }
 
 # Sidebar layout
@@ -227,7 +227,8 @@ app.layout = html.Div([
                 ], width=12)
             ])
         ],
-        style=CONTENT_STYLE
+        style=CONTENT_STYLE,
+        className="content"  # adding this class for targeting in CSS
     ),
     dcc.Loading(
         id="loading-race-df",
@@ -387,7 +388,6 @@ def update_graph(filtered_df, analyse_button, *values):
         return go.Figure(), modal_open  # Return an empty figure in case of an error
 
 
-
 @app.callback(Output('run_distribution_graph', 'figure'),
               Output('station_distribution_graph', 'figure'),
               Output('gauge_graph', 'figure'),
@@ -485,7 +485,6 @@ def _predict_percentile_finish_figure(user_runs, user_stations):
         }
     ))
     return updated_figure
-
 
 
 def _extract_runs_stations(values):
