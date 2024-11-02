@@ -4,10 +4,12 @@ from enum import Enum
 import re
 import itertools
 from tqdm import tqdm
+from tqdm.contrib.concurrent import thread_map
 from datetime import timedelta
 import numpy as np
 import pandas as pd
 import os
+
 
 ## helper classes
 class Division(Enum):
@@ -25,7 +27,6 @@ class Gender(Enum):
     mixed = "X"
 
 
-
 ## Helper Functions
 def get_html(url: str):
     cookie_retrieval = request("GET", url)
@@ -33,12 +34,13 @@ def get_html(url: str):
     response = request("GET", url, headers={"Cookie": cookie})
     return response.text
 
+
 def removeprefix(x: str, prefix: str):
     if x.startswith(prefix):
         return x[len(prefix):]
     return x
 
-    
+
 class HyroxParticipant:
     def __init__(self, id: str, name: str, division: Division, gender: Gender, age_group: str, time: str, link: str):
         self.id = id
@@ -113,13 +115,16 @@ class HyroxParticipant:
             finish = self._raw_splits[29]
 
             self.splits["total"] = np.sum(self._raw_splits)
-            self.splits["stations"] = [skierg_out, push_out, pull_out, burpee_out, row_out, carry_out, lunges_out, finish]
+            self.splits["stations"] = [skierg_out, push_out, pull_out, burpee_out, row_out, carry_out, lunges_out,
+                                       finish]
             self.splits["work"] = np.sum(self.splits["stations"])
-            self.splits["runs"] = [skierg_rox_in, push_rox_in, pull_rox_in, burpee_rox_in, row_rox_in, carry_rox_in, lunges_rox_in, wall_in]
+            self.splits["runs"] = [skierg_rox_in, push_rox_in, pull_rox_in, burpee_rox_in, row_rox_in, carry_rox_in,
+                                   lunges_rox_in, wall_in]
             self.splits["run"] = np.sum(self.splits["runs"])
-            self.splits["rests"] = [skierg_in + skierg_rox_out, push_in + push_rox_out, pull_in + pull_rox_out, burpee_in + burpee_rox_out, row_in + row_rox_out, carry_in + carry_rox_out, lunges_in + lunges_rox_out, timedelta()]
+            self.splits["rests"] = [skierg_in + skierg_rox_out, push_in + push_rox_out, pull_in + pull_rox_out,
+                                    burpee_in + burpee_rox_out, row_in + row_rox_out, carry_in + carry_rox_out,
+                                    lunges_in + lunges_rox_out, timedelta()]
             self.splits["roxzone"] = np.sum(self.splits["rests"])
-
 
         self._raw_splits = [get_diff(x) for x in range(30)]
         get_details()
@@ -161,6 +166,7 @@ class HyroxParticipant:
             str(self.splits["rests"][7]),
         ]
 
+
 class HyroxEvent:
     def __init__(self, event_id: str, season: int, print_name: str):
         self.event_id = event_id
@@ -168,7 +174,7 @@ class HyroxEvent:
         self.event_name = ""
         self.event_participants = dict((x, dict((y, []) for y in Gender)) for x in Division)
         self.num_event_participants = dict((x, dict((y, 0) for y in Gender)) for x in Division)
-        self.print_name = print_name  # naming this varialbe print name more due to being lazy as it's 11PM and have a 6:30 wake-up tomorrow - don't want to interfere with the previous logic of setting event_name empty and filling it in later
+        self.print_name = print_name  # naming this variable print name more due to being lazy as it's 11PM and have a 6:30 wake-up tomorrow - don't want to interfere with the previous logic of setting event_name empty and filling it in later
 
     @property
     def participants(self):
@@ -256,14 +262,15 @@ class HyroxEvent:
                     self.event_participants[division][gender].append(participant)
 
                 if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
-                    print(f'have retrieved {len(self.event_participants[division][gender])} out of {self.num_event_participants[division][gender]}')
+                    print(
+                        f'have retrieved {len(self.event_participants[division][gender])} out of {self.num_event_participants[division][gender]}')
                     page += 1
                 else:
                     break
 
-        for participant in tqdm(self.participants, desc="Retrieving splits"):
-            participant.get_timings()
-
+        # for participant in tqdm(self.participants, desc="Retrieving splits"):
+        #     participant.get_timings()
+        thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10, desc="Retrieving Splits")
         def participant_filter(p: HyroxParticipant):
             if p.ignore:
                 return False
@@ -280,10 +287,10 @@ class HyroxEvent:
             return True
 
         for division, gender in combinations:
-            self.event_participants[division][gender] = filter(participant_filter, self.event_participants[division][gender])
+            self.event_participants[division][gender] = filter(participant_filter,
+                                                               self.event_participants[division][gender])
 
     def save(self, directory: str = "/kaggle/working"):
-
         def participant_map(p: HyroxParticipant):
             arr = [self.event_id, self.event_name]
             arr.extend(p.to_array())
@@ -291,7 +298,11 @@ class HyroxEvent:
 
         df = pd.DataFrame(
             np.array(list(map(participant_map, self.participants))),
-            columns=["event_id", "event_name", "id", "name", "gender", "age_group", "division", "total_time", "work_time", "roxzone_time", "run_time", "run_1", "work_1", "roxzone_1", "run_2", "work_2", "roxzone_2", "run_3", "work_3", "roxzone_3", "run_4", "work_4", "roxzone_4", "run_5", "work_5", "roxzone_5", "run_6", "work_6", "roxzone_6", "run_7", "work_7", "roxzone_7", "run_8", "work_8", "roxzone_8"]
+            columns=["event_id", "event_name", "id", "name", "gender", "age_group", "division", "total_time",
+                     "work_time", "roxzone_time", "run_time", "run_1", "work_1", "roxzone_1", "run_2", "work_2",
+                     "roxzone_2", "run_3", "work_3", "roxzone_3", "run_4", "work_4", "roxzone_4", "run_5", "work_5",
+                     "roxzone_5", "run_6", "work_6", "roxzone_6", "run_7", "work_7", "roxzone_7", "run_8", "work_8",
+                     "roxzone_8"]
         )
 
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
@@ -313,13 +324,14 @@ class HyroxEvent:
         new_event.num_event_participants = self.num_event_participants
         return new_event
 
+
 # example of retrieving data
 # s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
 # laInfo = s5_losAngeles2022.get_info()
 # s5_losAngeles2022.save()
 def save_events(events):
     for event in events:
-    # try catch in case issue with any event, make sure we are still saving all data for events without problems
+        # try catch in case issue with any event, make sure we are still saving all data for events without problems
         try:
             event.get_info()
             event.save(directory="/hyroxData")
@@ -327,94 +339,17 @@ def save_events(events):
         except Exception as e:
             print(f"have caught exception {e} when storing down event {event.print_name} ")
 
-# s5_london2023 = HyroxEvent(event_id="JGDMS4JI47A", season=5)
-# s5_hongkong2023 = HyroxEvent(event_id="JGDMS4JI46F", season=5)
-# s5_dallas2023 = HyroxEvent(event_id="JGDMS4JI470", season=5)
-# s5_barcelona2023 = HyroxEvent(event_id="JGDMS4JI466", season=5)
-# s5_hamburg2023 = HyroxEvent(event_id="JGDMS4JI473", season=5)
-# s5_munchen2023 = HyroxEvent(event_id="JGDMS4JI464", season=5)
-# s5_manchesterWorldChamps2023 = HyroxEvent(event_id="2EFMS4JI335", season=5)
-# s5_rotterdam2023 = HyroxEvent(event_id="JGDMS4JI46E", season=5)
-# s5_hannover2023 = HyroxEvent(event_id="JGDMS4JI46C", season=5)
-# s5_anaheim2923 = HyroxEvent(event_id="JGDMS4JI472", season=5)
-# s5_koln2023 = HyroxEvent(event_id="JGDMS4JI468", season=5)
-# s5_malaga2023 = HyroxEvent(event_id="JGDMS4JI46A", season=5)
-# s5_miami2023 = HyroxEvent(event_id="JGDMS4JI474", season=5)
-# s5_karlsruhe2023 = HyroxEvent(event_id="JGDMS4JI465", season=5)
-# s5_wien2023 = HyroxEvent(event_id="JGDMS4JI461", season=5)
-# s5_houston2023 = HyroxEvent(event_id="JGDMS4JI462", season=5)
-# s5_glasgow2023 = HyroxEvent(event_id="JGDMS4JI439", season=5)
-# s5_chichago_americanChamps = HyroxEvent(event_id="JGDMS4JI44E", season=5)
-# s5_bilbao2023 = HyroxEvent(event_id="JGDMS4JI44F", season=5)
-# s5_stuttgart2023 = HyroxEvent(event_id="JGDMS4JI44D", season=5)
-# s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5)
-# s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5)
 
-
+s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5, print_name="Manchester2023")
+s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5, print_name="EuroChamps2023")
 ## 2024 DATA
-# maastricth2024 = HyroxEvent(event_id="JGDMS4JI6AA", season=6, print_name="maastricht2024")
-turin2024 = HyroxEvent(event_id="JGDMS4JI6AB", season=6, print_name="turin2024")
-manchester2024 = HyroxEvent(event_id="JGDMS4JI6BA", season=6, print_name="manchester2024")
-dubai2024 = HyroxEvent(event_id="JGDMS4JI6CE", season=6, print_name="dubai2024")
-biblao2024 = HyroxEvent(event_id="JGDMS4JI6CD", season=6, print_name="bilbao2024")
-incheon2024 = HyroxEvent(event_id="JGDMS4JI6F5", season=6, print_name="incheon2024")
-katowice2024 = HyroxEvent(event_id="JGDMS4JI70A", season=6, print_name="katowice2024")
-fortLauderdale2024 = HyroxEvent(event_id="JGDMS4JI709", season=6, print_name="forLauderdale2024")
-madrid2024 = HyroxEvent(event_id="JGDMS4JI71D", season=6, print_name="madrid2024")
-glasgow2024 = HyroxEvent(event_id="JGDMS4JI70C", season=6, print_name="glasgow2024")
-karlshrue2024 = HyroxEvent(event_id="JGDMS4JI745", season=6, print_name="karlshrue2024")
-houston2024 = HyroxEvent(event_id="JGDMS4JI748", season=6, print_name="houston2024")
-copenhagen2024 = HyroxEvent(event_id="JGDMS4JI731", season=6, print_name="copenhagen2024")
-rotterdam2024 = HyroxEvent(event_id="JGDMS4JI747", season=6, print_name="rotterdam2024")
-malaga2024 = HyroxEvent(event_id="JGDMS4JI75A", season=6, print_name="malaga2024")
-koln2024 = HyroxEvent(event_id="JGDMS4JI771", season=6, print_name="koln2024")
-mexico2024 = HyroxEvent(event_id="JGDMS4JI76F",season=6, print_name="mexico2024")
-berlin2024 = HyroxEvent(event_id="JGDMS4JI781", season=6, print_name="berlin2024")
-bordeaux2024 = HyroxEvent(event_id="JGDMS4JI759", season=6, print_name="bordeaux2024")
 london2024 = HyroxEvent(event_id="JGDMS4JI7AA", season=6, print_name="london2024")
 gdansk2024 = HyroxEvent(event_id="JGDMS4JI7FB", season=6, print_name="gdansk2024")
 rimini2024 = HyroxEvent(event_id="JGDMS4JI80E", season=6, print_name="rimini2024")
 newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork2024")
 
-# store elements in the list for easier manipulation
-# events_list2023 = [
-#     s5_london2023,
-#     s5_hongkong2023,
-#     s5_dallas2023,
-#     s5_barcelona2023,
-#     s5_hamburg2023,
-#     s5_munchen2023,
-#     s5_manchesterWorldChamps2023,
-#     s5_rotterdam2023,
-#     s5_hannover2023,
-#     s5_anaheim2923,
-#     s5_koln2023,
-#     s5_malaga2023,
-#     s5_miami2023,
-#     s5_karlsruhe2023,
-#     s5_wien2023,
-#     s5_houston2023,
-#     s5_glasgow2023,
-#     s5_chichago_americanChamps,
-#     s5_bilbao2023,
-#     s5_stuttgart2023,
-#     s5_manchester2023,
-#     s5_euroChamps2023
-# ]
 if __name__ == '__main__':
 
-    events_list2024 = [
-    turin2024, manchester2024, dubai2024, biblao2024, incheon2024,
-    katowice2024, fortLauderdale2024, madrid2024, glasgow2024, karlshrue2024,
-    houston2024, copenhagen2024, rotterdam2024, malaga2024, koln2024, mexico2024,
-    berlin2024, bordeaux2024, london2024, gdansk2024, rimini2024, newYork2024
-    ]
-#
 
-    events_list2024_leftoff = [berlin2024]
-    save_events(events_list2024_leftoff)
-    #save_events([s5_barcelona2023])
-
-
-
-
+    two_events = [gdansk2024, gdansk2024]
+    save_events(two_events)
