@@ -10,12 +10,11 @@ import hyrox_results_analysis as _hra
 import data_loading_helpers as _dlh
 import constants as _constants
 import helpers as _helpers
+import pickle
 
 # Constants and styles
 DATA_PATH = "assets/hyroxData"
 all_race_names = _dlh.list_files_in_directory(DATA_PATH)
-
-
 
 SIDEBAR_STYLE = {
     "position": "fixed",
@@ -94,128 +93,154 @@ sidebar = html.Div(
 )
 
 # Tabs Layout
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX, "/assets/styles.css"])
 server = app.server
 
 app.layout = html.Div([
-            html.Div(sidebar),
-            html.Div(
+    html.Div(sidebar),
+    html.Div(
+        [
+            dbc.Modal(
                 [
-                    dbc.Modal(
-                        [
-                            dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
-                            dbc.ModalBody(
-                                "Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
-                            dbc.ModalFooter(
-                                dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
-                            )
-                        ],
-                        id="modal",
-                        is_open=False
-                    ),
+                    dbc.ModalHeader(dbc.ModalTitle("Wrong Input")),
+                    dbc.ModalBody(
+                        "Please ensure all times are inputted and follow the expected format (e.g. 4:50)"),
+                    dbc.ModalFooter(
+                        dbc.Button("Close", id="close", className="ms-auto", n_clicks=0)
+                    )
+                ],
+                id="modal",
+                is_open=False
+            ),
+            dbc.Row([
+                dbc.Col(
+                    html.H2("Hyrox Results Analysis", style={
+                        'textAlign': 'center',
+                        'color': '#333',
+                        'marginBottom': '40px'
+                    })
+                )
+            ]),
+            dbc.Row([
+                dbc.Col(
                     dbc.Row([
                         dbc.Col(
-                            html.H2("Hyrox Results Analysis", style={
-                                'textAlign': 'center',
-                                'color': '#333',
-                                'marginBottom': '40px'
-                            })
-                        )
-                    ]),
-                    dbc.Row([
-                        dbc.Col(
-                            dbc.Row([
-                                dbc.Col(
-                                    dcc.Loading(
-                                        id="loading-race-info",
-                                        type="circle",
-                                        children=dbc.Card(
-                                            [
-                                                dbc.CardHeader("Race Information"),
-                                                dbc.CardBody([
-                                                    html.P(className="card-title", id="race_name"),
-                                                    html.P(className="card-text", id="participants")
-                                                ])
-                                            ]
-                                        )
-                                    ), width=4
-                                ),
-                                dbc.Col(
-                                    dcc.Loading(
-                                        id="loading-fastest-time",
-                                        type="circle",
-                                        children=dbc.Card(
-                                            [
-                                                dbc.CardHeader("Fastest Race Time"),
-                                                dbc.CardBody([
-                                                    html.P(className='card-text', id="fastest")
-                                                ])
-                                            ]
-                                        )
-                                    ), width=4
-                                ),
-                                dbc.Col(
-                                    dcc.Loading(
-                                        id="loading-average-time",
-                                        type="circle",
-                                        children=dbc.Card(
-                                            [
-                                                dbc.CardHeader("Average Race Time"),
-                                                dbc.CardBody([
-                                                    html.P(className="card-text", id="average")
-                                                ])
-                                            ]
-                                        )
-                                    ), width=4
-                                ),
-                            ]), width=12
-                        )
-                    ]),
-                    dbc.Row([
-                        dbc.Col(
-                            html.Div(children=[
-                                dcc.Loading(
-                                    id="loading-race-graph",
-                                    type="circle",
-                                    children=dcc.Graph(figure={}, id="race_graph")
+                            dcc.Loading(
+                                id="loading-race-info",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Race Information"),
+                                        dbc.CardBody([
+                                            html.P(className="card-title", id="race_name"),
+                                            html.P(className="card-text", id="participants")
+                                        ])
+                                    ]
                                 )
-                            ]), width=12
-                        )
-                    ]),
-                    dbc.Row([
-                        dbc.Col(
-                            html.Div(children=[
-                                dcc.Loading(
-                                    id="loading-run-distribution-graph",
-                                    type="circle",
-                                    children=dcc.Graph(figure={}, id="run_distribution_graph")
-                                )
-                            ]), width=6
+                            ), width=4
                         ),
                         dbc.Col(
-                            html.Div(children=[
-                                dcc.Loading(
-                                    id='loading-station-distribution-graph',
-                                    type="circle",
-                                    children=dcc.Graph(figure={}, id="station_distribution_graph")
+                            dcc.Loading(
+                                id="loading-fastest-time",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Fastest Race Time"),
+                                        dbc.CardBody([
+                                            html.P(className='card-text', id="fastest")
+                                        ])
+                                    ]
                                 )
-                            ])
+                            ), width=4
+                        ),
+                        dbc.Col(
+                            dcc.Loading(
+                                id="loading-average-time",
+                                type="circle",
+                                children=dbc.Card(
+                                    [
+                                        dbc.CardHeader("Average Race Time"),
+                                        dbc.CardBody([
+                                            html.P(className="card-text", id="average")
+                                        ])
+                                    ]
+                                )
+                            ), width=4
+                        ),
+                    ]), width=12
+                )
+            ]),
+            dbc.Row([
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id="loading-race-graph",
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="race_graph")
                         )
-                    ]),
-                ],
-                style=CONTENT_STYLE
-            ),
-            dcc.Loading(
-                id="loading-race-df",
-                type="circle",
-                children=dcc.Store(id='race_df')
-            ),
-            dcc.Loading(
-                id="loading-filtered-df",
-                type="circle",
-                children=dcc.Store(id='filtered_df')
-            )
-        ])
+                    ]), width=12
+                )
+            ]),
+            dbc.Row([
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id="loading-run-distribution-graph",
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="run_distribution_graph")
+                        )
+                    ]), width=6
+                ),
+                dbc.Col(
+                    html.Div(children=[
+                        dcc.Loading(
+                            id='loading-station-distribution-graph',
+                            type="circle",
+                            children=dcc.Graph(figure={}, id="station_distribution_graph")
+                        )
+                    ])
+                )
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    html.H4("Your predicted percentile finish ", style={'textAlign': 'center'}),
+                    dcc.Loading(
+                        id='loading-gauge',
+                        type="circle",
+                        children=dcc.Graph(
+                            id='gauge_graph',
+                            figure=go.Figure(go.Indicator(
+                                mode="gauge+number",
+                                value=0,  # Sample value, you can set this dynamically based on your data
+                                title={'text': "Percentile Finish"},
+                                gauge={
+                                    'axis': {'range': [None, 100]},
+                                    'bar': {'color': "#f5a623"},
+                                    'steps': [
+                                        {'range': [0, 50], 'color': "#e6e6e6"},
+                                        {'range': [50, 100], 'color': "#c8d6e5"}
+                                    ],
+                                }
+                            )),
+                        )
+                    )
+                ], width=12)
+            ])
+        ],
+        style=CONTENT_STYLE
+    ),
+    dcc.Loading(
+        id="loading-race-df",
+        type="circle",
+        children=dcc.Store(id='race_df')
+    ),
+    dcc.Loading(
+        id="loading-filtered-df",
+        type="circle",
+        children=dcc.Store(id='filtered_df')
+    )
+])
+
 
 # Callbacks
 
@@ -362,8 +387,10 @@ def update_graph(filtered_df, analyse_button, *values):
         return go.Figure(), modal_open  # Return an empty figure in case of an error
 
 
+
 @app.callback(Output('run_distribution_graph', 'figure'),
               Output('station_distribution_graph', 'figure'),
+              Output('gauge_graph', 'figure'),
               Input('filtered_df', 'data'),
               Input('analyse_button', 'n_clicks'),
               [State(i, 'value') for i in _constants.ALL_USER_INPUTS])
@@ -406,12 +433,14 @@ def update_distribution_graphs(filtered_df, n_clicks, *values):
                                    textposition='top center')
                     )
                 )
-                return run_distribution_fig, station_distribution_fig
+                # if we are in the case where the user has clicked the analyse button, then we are also interested in updating the 'gauge' graph
+                gauge_graph = _predict_percentile_finish_figure(user_runs, user_stations)
+                return run_distribution_fig, station_distribution_fig, gauge_graph
         else:
-            return run_distribution_fig, station_distribution_fig
+            return run_distribution_fig, station_distribution_fig, go.Figure()
 
     except Exception as e:
-        return go.Figure(), go.Figure()  # Return an empty figure in case of an error
+        return go.Figure(), go.Figure(), go.Figure()  # Return an empty figure in case of an error
 
 
 @app.callback(Output('fastest', 'children'), Output('average', 'children'), Input('filtered_df', 'data'))
@@ -433,8 +462,32 @@ def update_card_displays(filtered_df):
         return f"Exception caught when extracting fastest and average times from filtered df: {e}"
 
 
-
 ####  PRIVATE API ####
+def _predict_percentile_finish_figure(user_runs, user_stations):
+    #  load in the random forest classifier
+    rf_classifier_path = "rf_classifier.sav"
+    with open(rf_classifier_path, 'rb') as file:
+        model = pickle.load(file)
+    runs_stations = user_runs + user_stations
+    runs_stations = np.array(runs_stations)
+    percentile_finish = model.predict(runs_stations.reshape(1, -1))
+    updated_figure = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=percentile_finish[0],
+        title={'text': "Percentile Finish"},
+        gauge={
+            'axis': {'range': [0, 100]},
+            'bar': {'color': "#f5a623"},
+            'steps': [
+                {'range': [0, 50], 'color': "#e6e6e6"},
+                {'range': [50, 100], 'color': "#c8d6e5"}
+            ],
+        }
+    ))
+    return updated_figure
+
+
+
 def _extract_runs_stations(values):
     user_runs = []
     user_stations = []
