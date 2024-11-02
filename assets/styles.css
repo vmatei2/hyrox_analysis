@@ -92,13 +92,24 @@ h2 {
 
 @media (max-width: 767px) {
     #sidebar {
-        position: relative;
         width: 100%;
     }
     .content {
         margin-left: 0;
+        padding: 10px;
     }
-    .content h2, .content .card {
-        font-size: smaller;
+    .content h2 {
+        font-size: 1.5em;
+        margin-bottom: 20px;
+    }
+    .card {
+        font-size: 1em;
+    }
+    .dccInput, .slider {
+        font-size: larger;
+        padding: 8px;
+    }
+    .dccGraph {
+        overflow-x: scroll;  # Allow horizontal scroll for graphs
     }
 }
