@@ -191,14 +191,31 @@ class HyroxEvent:
         combinations = list(itertools.product(Division, Gender))
         pbar = tqdm(combinations, desc="Retrieving participants")
         print(f'Retrieving participants for {self.print_name}')
-        for division, gender in pbar:
-            page = 1
-            while True:
-                pbar.set_postfix({
-                    "Division": division.name,
-                    "Gender": gender.name,
-                    "Page": page
-                })
+
+        thread_map(self.retrieve_combination, combinations, max_workers=4, desc="Retrieving Participants")
+        thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10, desc="Retrieving Splits")
+        def participant_filter(p: HyroxParticipant):
+            if p.ignore:
+                return False
+
+            if any(list(map(lambda x: x < timedelta(), p.splits["stations"]))):
+                return False
+
+            if any(list(map(lambda x: x < timedelta(), p.splits["runs"]))):
+                return False
+
+            if any(list(map(lambda x: x < timedelta(), p.splits["rests"]))):
+                return False
+
+            return True
+
+        for division, gender in combinations:
+            self.event_participants[division][gender] = filter(participant_filter,
+                                                               self.event_participants[division][gender])
+    def retrieve_combination(self, combination):
+        division, gender = combination
+        page = 1
+        while True:
                 url = self.generate_url(page, division=division, gender=gender)
                 html = get_html(url)
                 soup = BeautifulSoup(html, 'html.parser')
@@ -262,33 +279,11 @@ class HyroxEvent:
                     self.event_participants[division][gender].append(participant)
 
                 if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
-                    print(
-                        f'have retrieved {len(self.event_participants[division][gender])} out of {self.num_event_participants[division][gender]}')
+                    print(f'Finished page: {page}')
                     page += 1
                 else:
                     break
 
-        # for participant in tqdm(self.participants, desc="Retrieving splits"):
-        #     participant.get_timings()
-        thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10, desc="Retrieving Splits")
-        def participant_filter(p: HyroxParticipant):
-            if p.ignore:
-                return False
-
-            if any(list(map(lambda x: x < timedelta(), p.splits["stations"]))):
-                return False
-
-            if any(list(map(lambda x: x < timedelta(), p.splits["runs"]))):
-                return False
-
-            if any(list(map(lambda x: x < timedelta(), p.splits["rests"]))):
-                return False
-
-            return True
-
-        for division, gender in combinations:
-            self.event_participants[division][gender] = filter(participant_filter,
-                                                               self.event_participants[division][gender])
 
     def save(self, directory: str = "/kaggle/working"):
         def participant_map(p: HyroxParticipant):
@@ -308,7 +303,7 @@ class HyroxEvent:
         df.insert(5, "nationality", df["name"].str.extract(r'\(([A-Z]{3})\)', expand=False))
         df.drop(["id"], axis=1, inplace=True)
         directory = os.path.dirname(__file__)
-        hyroxDirectory = directory + "/hyroxData"
+        hyroxDirectory = directory + "/assets/hyroxData"
         df.to_csv(os.path.join(hyroxDirectory, f"{self.event_name}.csv"), index=False)
 
     def copy(self):
