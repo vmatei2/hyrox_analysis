@@ -45,7 +45,7 @@ def load_one_file(path):
     df = df.reset_index(drop=True)
     df['Position'] = range(1, len(df) + 1)
     # pre-processing part
-    for col in _constants.RUN_LABELS + _constants.WORK_LABELS + _constants.ROXZONE_LABELS + ["total_time"]:
+    for col in _constants.RUN_LABELS + _constants.WORK_LABELS + _constants.ROXZONE_LABELS + ["total_time", "work_time", "roxzone_time", "run_time"]:
         df[col] = pd.to_timedelta(df[col])
         # convert to minutes
         df[col] = df[col].dt.total_seconds() / 60.0
