@@ -64,6 +64,8 @@ def round_to_nearest_5(x):
 
 def get_division_entry(df, gender, division):
     subset_df = df[(df['gender'] == gender) & (df['division'] == division)]
+    #  filter on total time - seen some birmingham 2024 data where a user had done 23 mins - would love it to be true but pretty impossible
+    subset_df = subset_df[subset_df['total_time'] > 50]
     return subset_df
 
 
@@ -276,9 +278,9 @@ def plot_distributions(df):
     plt.show()
 
 
-def line_plot_runs(df):
+def line_plot_runs(df, user_df):
     """
-    Function to line plot all runs of top 10 athletes
+    Function to line plot all runs of top 10 athletes, along with a selected user
     Main point behind this function is to explore whether we can see a pattern emerging in how the top athletes in Hyrox run across a race?
     :param df:
     :return:
@@ -292,11 +294,18 @@ def line_plot_runs(df):
     for index, row in (run_cols.head(10)).iterrows():
         plt.plot(row, label=f'Position {i + 1}')
         i += 1
+
+    # user_runs = user_df.filter(regex=r'^run_\d+$')
+    # user_runs_tp = user_runs.transpose()
+    # plt.plot(user_runs, label=user_df['name'].item())
+
+
     plt.xlabel('Runs')
     plt.ylabel('Run Times (minutes - i.e 4.5 = 4min30s)')
     plt.title('Line Plot of Each Row (Run Columns Only)')
     plt.legend()
     plt.show()
+
 
 
 def random_forest_classifier(df, save_as_name):

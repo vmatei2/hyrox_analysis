@@ -193,7 +193,9 @@ class HyroxEvent:
         print(f'Retrieving participants for {self.print_name}')
 
         thread_map(self.retrieve_combination, combinations, max_workers=4, desc="Retrieving Participants")
-        thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10, desc="Retrieving Splits")
+        thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10,
+                   desc="Retrieving Splits")
+
         def participant_filter(p: HyroxParticipant):
             if p.ignore:
                 return False
@@ -212,78 +214,78 @@ class HyroxEvent:
         for division, gender in combinations:
             self.event_participants[division][gender] = filter(participant_filter,
                                                                self.event_participants[division][gender])
+
     def retrieve_combination(self, combination):
         division, gender = combination
         page = 1
         while True:
-                url = self.generate_url(page, division=division, gender=gender)
-                html = get_html(url)
-                soup = BeautifulSoup(html, 'html.parser')
+            url = self.generate_url(page, division=division, gender=gender)
+            html = get_html(url)
+            soup = BeautifulSoup(html, 'html.parser')
 
-                h2_title: str = soup.h2.text.strip()
-                h2_title = removeprefix(h2_title, "Results: ").split(" / HYROX")[0]
-                if h2_title == "General Ranking / All":
-                    break
+            h2_title: str = soup.h2.text.strip()
+            h2_title = removeprefix(h2_title, "Results: ").split(" / HYROX")[0]
+            if h2_title == "General Ranking / All":
+                break
 
-                list_headers = soup.select(".list-group-header .list-field")
-                if len(list_headers) > 0 and list_headers[0].text.strip() == "Race":
-                    break
+            list_headers = soup.select(".list-group-header .list-field")
+            if len(list_headers) > 0 and list_headers[0].text.strip() == "Race":
+                break
 
-                if self.event_name == "":
-                    self.event_name = f"S{self.season} {h2_title.strip()}"
-                    if self.event_name == "S4 WorldChampionship - Leipzig":
-                        self.event_name = "S4 2021 Leipzig - World Championship"
+            if self.event_name == "":
+                self.event_name = f"S{self.season} {h2_title.strip()}"
+                if self.event_name == "S4 WorldChampionship - Leipzig":
+                    self.event_name = "S4 2021 Leipzig - World Championship"
 
-                if self.num_event_participants[division][gender] == 0:
-                    list_info: str = soup.find(class_="list-info").li.text
-                    num_participants = int(re.findall("(\d+) Results", list_info)[0])
-                    self.num_event_participants[division][gender] = num_participants
+            if self.num_event_participants[division][gender] == 0:
+                list_info: str = soup.find(class_="list-info").li.text
+                num_participants = int(re.findall("(\d+) Results", list_info)[0])
+                self.num_event_participants[division][gender] = num_participants
 
-                list_rows = list(soup.find_all("li", class_="list-group-item row"))
-                list_rows.extend(list(soup.find_all("li", class_="list-active list-group-item row")))
+            list_rows = list(soup.find_all("li", class_="list-group-item row"))
+            list_rows.extend(list(soup.find_all("li", class_="list-active list-group-item row")))
 
-                for row in list_rows:
-                    fields = row.select(".list-field")
+            for row in list_rows:
+                fields = row.select(".list-field")
 
-                    id = ""
-                    name = ""
-                    age_group = ""
-                    time = ""
-                    link = ""
+                id = ""
+                name = ""
+                age_group = ""
+                time = ""
+                link = ""
 
-                    for field_i in range(len(list_headers)):
-                        header = "".join(list_headers[field_i].find_all(string=True, recursive=False))
-                        field = fields[field_i]
-                        field_content = field.text.strip()
-                        if header == "Number":
-                            id = removeprefix(field_content, "Number")
-                        elif header == "Age Group":
-                            age_group = removeprefix(field_content, "Age Group")
-                            if age_group == "–":
-                                age_group = ""
-                        elif header == "Name" or header == "Member":
-                            name = field_content
-                            link = f"https://hyrox.r.mikatiming.com/season-{self.season}/{field.a.get('href')}"
-                        elif header == "Total":
-                            time = removeprefix(field_content, "Total")
+                for field_i in range(len(list_headers)):
+                    header = "".join(list_headers[field_i].find_all(string=True, recursive=False))
+                    field = fields[field_i]
+                    field_content = field.text.strip()
+                    if header == "Number":
+                        id = removeprefix(field_content, "Number")
+                    elif header == "Age Group":
+                        age_group = removeprefix(field_content, "Age Group")
+                        if age_group == "–":
+                            age_group = ""
+                    elif header == "Name" or header == "Member":
+                        name = field_content
+                        link = f"https://hyrox.r.mikatiming.com/season-{self.season}/{field.a.get('href')}"
+                    elif header == "Total":
+                        time = removeprefix(field_content, "Total")
 
-                    participant = HyroxParticipant(
-                        id=id,
-                        name=name,
-                        division=division,
-                        gender=gender,
-                        age_group=age_group,
-                        time=time,
-                        link=link
-                    )
-                    self.event_participants[division][gender].append(participant)
+                participant = HyroxParticipant(
+                    id=id,
+                    name=name,
+                    division=division,
+                    gender=gender,
+                    age_group=age_group,
+                    time=time,
+                    link=link
+                )
+                self.event_participants[division][gender].append(participant)
 
-                if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
-                    print(f'Finished page: {page}')
-                    page += 1
-                else:
-                    break
-
+            if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
+                print(f'Finished page: {page}')
+                page += 1
+            else:
+                break
 
     def save(self, directory: str = "/kaggle/working"):
         def participant_map(p: HyroxParticipant):
@@ -320,10 +322,6 @@ class HyroxEvent:
         return new_event
 
 
-# example of retrieving data
-# s5_losAngeles2022 = HyroxEvent(event_id="JGDMS4JI3FE",  season=5)
-# laInfo = s5_losAngeles2022.get_info()
-# s5_losAngeles2022.save()
 def save_events(events):
     for event in events:
         # try catch in case issue with any event, make sure we are still saving all data for events without problems
@@ -343,8 +341,8 @@ gdansk2024 = HyroxEvent(event_id="JGDMS4JI7FB", season=6, print_name="gdansk2024
 rimini2024 = HyroxEvent(event_id="JGDMS4JI80E", season=6, print_name="rimini2024")
 newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork2024")
 
+birminghamS7 = HyroxEvent(event_id="UKBOveralll", season=7, print_name="birminghamOct2024")
+
 if __name__ == '__main__':
-
-
-    two_events = [gdansk2024, gdansk2024]
-    save_events(two_events)
+    subset = [birminghamS7]
+    save_events(subset)
