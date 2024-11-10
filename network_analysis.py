@@ -9,6 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import euclidean, pdist, squareform
 import network_helpers as net_help
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
 def select_user(df, name):
     """
@@ -64,56 +66,62 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
     :return: A NetworkX graph with athletes as nodes and similarity-based edges.
     """
 
-    # Define weights for each feature
-    weights = np.array([
-        2,  # weight for work_time
-        2,  # weight for roxzone_time
-        2,  # weight for run_time
-        1, 1, 1, 1, 1, 1, 1, 1,  # weights for individual run segments (run_1 to run_8)
-        3,  # weight for work_to_run_ratio
-        3,  # weight for roxzone_to_total_ratio
-        2  # weight for first_half_to_second_half_ratio
-    ])
-
-    weights = np.array([2, 0.3, 2, 1, 0.5, 0.3, 1.5, 3.1, 1, 1, 1, 0.3, 0.1, 0.1, 4])
+    # Prepare data
     metrics = df[['work_time', 'roxzone_time', 'run_time', 'run_1', 'run_2', 'run_3', 'run_4',
                   'run_5', 'run_6', 'run_7', 'run_8', 'work_to_run_ratio', 'roxzone_to_total_ratio',
-                  'first_half_to_second_half_ratio', 'total_time']].values * weights
-    # scaler = MinMaxScaler()
-    # metrics = scaler.fit_transform(metrics)
-    # Initialize the graph
-    G = nx.Graph()
+                  'first_half_to_second_half_ratio', 'total_time']].values
 
-    # Add nodes with athlete names
+    # Calculate all pairwise Euclidean distances
+    distances = pdist(metrics, metric='euclidean')
+    distance_matrix = squareform(distances)  # Convert to a square matrix format
+
+    # Initialize the graph and add nodes
+    G = nx.Graph()
     for name in df['name']:
         G.add_node(name)
 
-    for i, name_i in enumerate(df['name']):
-        print(f'done with athlete: {i+1}')
-        print((f'{len(df) - i + 1} athletes left'))
+    #  Helper function to add edges based on the threshold distance
+    def add_edges_for_row(i):
+        edges = []
         for j in range(i + 1, len(df)):
-            name_j = df['name'].iloc[j]
-            euclidead_distance = euclidean(metrics[i], metrics[j])
-            if euclidead_distance < threshold:
-                G.add_edge(name_i, name_j,
-                           weight=1 / euclidead_distance + 1e-5)  # use inverse distance for 'similarity'
+            euclidean_distance = distance_matrix[i, j]
+            if euclidean_distance < threshold:
+                name_i = df['name'].iloc[i]
+                name_j = df['name'].iloc[j]
+                weight = 1 / (euclidean_distance + 1e-5)  # Use inverse distance for weight
+                edges.append((name_i, name_j, weight))
+        return edges
 
+    # Parallel processing using ThreadPoolExecutor
+    all_edges = []
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(add_edges_for_row, i): i for i in range(len(df))}
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing athletes"):
+            all_edges.extend(future.result())
+
+
+    G.add_weighted_edges_from(all_edges)
     return G
 
 s7_birmingham = load_one_file("assets/hyroxData/S7 2024 Birmingham.csv")
 bmham_filtered = get_division_entry(s7_birmingham, "male", "open")
 bmham_filtered = calculate_performance_ratios(bmham_filtered)
-network = build_weighted_athlete_network_with_features(bmham_filtered, 0.95)
+network = build_weighted_athlete_network_with_features(bmham_filtered, 5)
 
 # Position nodes using the spring layout for a more spread-out look
 d = nx.degree(network)
 pos = nx.spring_layout(network, seed=42)
 degree_values = [v for k, v in d]
+print('calculating communities')
+communities = list(nx.community.louvain_communities(network))
+print('finished calculating communities')
+breakhere = 0
+
 # Draw nodes and edges
-plt.figure(figsize=(16, 16))
-nx.draw_networkx(network, pos=nx.spring_layout(network, k=0.99), nodelist=network.nodes(), node_size=[v * 10 for v in degree_values],
-                     with_labels=True,
-                     node_color='lightgreen', alpha=0.6)
-# Display the visualization
-plt.title("Athlete Network Based on Performance Similarity")
-plt.show()
+# plt.figure(figsize=(16, 16))
+# nx.draw_networkx(network, pos=nx.spring_layout(network, k=0.99), nodelist=network.nodes(), node_size=[v * 10 for v in degree_values],
+#                      with_labels=True,
+#                      node_color='lightgreen', alpha=0.6)
+# # Display the visualization
+# plt.title("Athlete Network Based on Performance Similarity")
+# plt.show()
