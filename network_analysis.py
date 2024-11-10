@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import euclidean, pdist, squareform
-
+import network_helpers as net_help
 
 def select_user(df, name):
     """
@@ -89,11 +89,9 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
         G.add_node(name)
 
     for i, name_i in enumerate(df['name']):
-        athlete_i_times = metrics[i]
         print(f'done with athlete: {i+1}')
         print((f'{len(df) - i + 1} athletes left'))
         for j in range(i + 1, len(df)):
-            athlete_j_times = metrics[j]
             name_j = df['name'].iloc[j]
             euclidead_distance = euclidean(metrics[i], metrics[j])
             if euclidead_distance < threshold:
@@ -102,24 +100,20 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
 
     return G
 
-
-
-
 s7_birmingham = load_one_file("assets/hyroxData/S7 2024 Birmingham.csv")
 bmham_filtered = get_division_entry(s7_birmingham, "male", "open")
 bmham_filtered = calculate_performance_ratios(bmham_filtered)
 network = build_weighted_athlete_network_with_features(bmham_filtered, 0.95)
 
-
 # Position nodes using the spring layout for a more spread-out look
+d = nx.degree(network)
 pos = nx.spring_layout(network, seed=42)
-
+degree_values = [v for k, v in d]
 # Draw nodes and edges
-plt.figure(figsize=(20, 20))
-nx.draw_networkx_nodes(network, pos, node_size=50, node_color="skyblue")
-nx.draw_networkx_edges(network, pos, width=0.7, alpha=1)
-nx.draw_networkx_labels(network, pos, font_size=10)
-
+plt.figure(figsize=(16, 16))
+nx.draw_networkx(network, pos=nx.spring_layout(network, k=0.99), nodelist=network.nodes(), node_size=[v * 10 for v in degree_values],
+                     with_labels=True,
+                     node_color='lightgreen', alpha=0.6)
 # Display the visualization
 plt.title("Athlete Network Based on Performance Similarity")
 plt.show()
