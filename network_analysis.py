@@ -49,6 +49,10 @@ def calculate_performance_ratios(df):
     df['work_to_run_ratio'] = df['work_time'] / df['run_time']
     #  2. Roxzone Time to Total Time ratio
     df['roxzone_to_total_ratio'] = df['roxzone_time'] / df['total_time']
+    #  3. Run 1 to Run 8 -- how much can people hold their pace?
+    df['run1_to_run8'] = df['run_1'] / df['run_8']
+    df['sled_oush_to_sled_pull'] = df['work_2'] / df['work_3']
+
 
     #  3. First half to second half ratio (run and work times)
     first_half_time = df[['run_1', 'run_2', 'run_3', 'run_4', 'work_1', 'work_2', 'work_3', 'work_4']].sum(axis=1)
@@ -67,9 +71,8 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
     """
 
     # Prepare data
-    metrics = df[['work_time', 'roxzone_time', 'run_time', 'run_1', 'run_2', 'run_3', 'run_4',
-                  'run_5', 'run_6', 'run_7', 'run_8', 'work_to_run_ratio', 'roxzone_to_total_ratio',
-                  'first_half_to_second_half_ratio', 'total_time']].values
+    metrics = df[['roxzone_time', 'total_time', 'work_2', 'work_3', 'work_4', 'work_to_run_ratio', 'roxzone_to_total_ratio',
+                  'first_half_to_second_half_ratio']].values
 
     # Calculate all pairwise Euclidean distances
     distances = pdist(metrics, metric='euclidean')
@@ -98,7 +101,6 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
         futures = {executor.submit(add_edges_for_row, i): i for i in range(len(df))}
         for future in tqdm(as_completed(futures), total=len(futures), desc="Processing athletes"):
             all_edges.extend(future.result())
-
 
     G.add_weighted_edges_from(all_edges)
     return G
