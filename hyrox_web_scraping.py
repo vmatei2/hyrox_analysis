@@ -16,7 +16,7 @@ from concurrent.futures  import ThreadPoolExecutor
 class Division(Enum):
     open = "H"
     # pro = "HPRO"
-    doubles = "HD"
+    # doubles = "HD"
     # relay = "HMR"
     # goruck = "HG"
     # goruck_doubles = "HDG"
@@ -24,8 +24,8 @@ class Division(Enum):
 
 class Gender(Enum):
     male = "M"
-    female = "W"
-    mixed = "X"
+    # female = "W"
+    # mixed = "X"
 
 
 ## Helper Functions
@@ -335,7 +335,7 @@ def save_events(events):
         # try catch in case issue with any event, make sure we are still saving all data for events without problems
         try:
             event.get_info()
-            event.save(directory="/hyroxData")
+            event.save()
             print('have saved event ', event.print_name)
         except Exception as e:
             print(f"have caught exception {e} when storing down event {event.print_name} ")
@@ -343,17 +343,19 @@ def save_events(events):
 
 s5_manchester2023 = HyroxEvent(event_id="JGDMS4JI425", season=5, print_name="Manchester2023")
 s5_euroChamps2023 = HyroxEvent(event_id="JGDMS4JI411", season=5, print_name="EuroChamps2023")
+
+
 ## 2024 DATA
+s6_london_excel = HyroxEvent(event_id="JGDMS4JI62E", season=6, print_name="london_excel")
 london2024 = HyroxEvent(event_id="JGDMS4JI7AA", season=6, print_name="london2024")
 gdansk2024 = HyroxEvent(event_id="JGDMS4JI7FB", season=6, print_name="gdansk2024")
 rimini2024 = HyroxEvent(event_id="JGDMS4JI80E", season=6, print_name="rimini2024")
 newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork2024")
-
 birminghamS7 = HyroxEvent(event_id="UKBOveralll", season=7, print_name="birminghamOct2024")
 
 dublinS7 = HyroxEvent(event_id="IEDOverall", season=7, print_name="dublinNov2024")
+rotterdamS6 = HyroxEvent(event_id="JGDMS4JI747", season=6, print_name="rotterdamApr2024")
 
-rotterdamS6 = HyroxEvent(event_id="H_JGDMS4JI747", season=6, print_name="rotterdamApr2024")
 if __name__ == '__main__':
-    subset = [dublinS7]
+    subset = [s6_london_excel]
     save_events(subset)
