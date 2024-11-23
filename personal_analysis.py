@@ -17,7 +17,7 @@ def compare_races(path_df_1, path_df_2, race_1_name, race_2_name, name_1, name_2
     df_1_user = df_1[df_1['name'].str.contains(name_1, case=False, na=False)]
     df_2_user = df_2[df_2['name'].str.contains(name_2, case=False, na=False)]
 
-    columns_to_extract = RACE_ORDER_LABELS + [ROXZONE_TIME] # ROXZONE_TIME is a string variable hence moving to list for concatenation
+    columns_to_extract = RACE_ORDER_LABELS + [ROXZONE_TIME] + [RUN_TIME] # ROXZONE_TIME is a string variable hence moving to list for concatenation
 
     race_1_times = df_1_user[columns_to_extract]
     race_2_times = df_2_user[columns_to_extract]
@@ -42,7 +42,7 @@ def compare_races(path_df_1, path_df_2, race_1_name, race_2_name, name_1, name_2
         ax.text(x_pos, y_pos, f'{diffs:.2f}', ha='center', fontsize=10, color='black')
 
     ax.set_xticks(x)
-    ax.set_xticklabels(ALL_USER_INPUTS + ['ROXZONE'], rotation=45, ha='right')
+    ax.set_xticklabels(RACE_ORDER_LABELS + ['ROXZONE'] + ['TOTAL_RUN_TIME'], rotation=45, ha='right')
     ax.set_ylabel('Time (in minutes) i.e 4.5 = 4min30s')
     if name_2 != name_1:
         name_comparison = f'{name_2} and {name_1}'
@@ -55,11 +55,14 @@ def compare_races(path_df_1, path_df_2, race_1_name, race_2_name, name_1, name_2
     plt.show()
 
 
-compare_races(path_df_1="assets/hyroxData/S6 2024 Rotterdam.csv", path_df_2="assets/hyroxData/S7 2024 Dublin.csv",
-              race_1_name="Rotterdam April 2024" , race_2_name="Dublin November 2024", name_1='Matei')
+# compare_races(path_df_1="assets/hyroxData/S6 2024 Rotterdam.csv", path_df_2="assets/hyroxData/S7 2024 Dublin.csv",
+#               race_1_name="Rotterdam April 2024" , race_2_name="Dublin November 2024", name_1='Matei')
+#
+# compare_races(path_df_1="assets/hyroxData/S6 2023 London.csv", path_df_2="assets/hyroxData/S7 2024 Birmingham.csv",
+#               race_1_name="London Excel 2023", race_2_name="Birmingham 2024", name_1="Ingham, James")
+#
+# compare_races(path_df_1="assets/hyroxData/S6 2023 London.csv", path_df_2="assets/hyroxData/S7 2024 Dublin.csv", race_1_name="London Excel 2023",
+#               race_2_name="Dublin 2024", name_1="Ingham, James", name_2="Matei, Vlad")
 
-compare_races(path_df_1="assets/hyroxData/S6 2023 London.csv", path_df_2="assets/hyroxData/S7 2024 Birmingham.csv",
-              race_1_name="London Excel 2023", race_2_name="Birmingham 2024", name_1="Ingham, James")
-
-compare_races(path_df_1="assets/hyroxData/S6 2023 London.csv", path_df_2="assets/hyroxData/S7 2024 Dublin.csv", race_1_name="London Excel 2023",
-              race_2_name="Dublin 2024", name_1="Ingham, James", name_2="Matei, Vlad")
+compare_races(path_df_1="assets/hyroxData/S7 2024 Birmingham.csv", path_df_2="assets/hyroxData/S7 2024 Manchester.csv", race_1_name="Birmingham 2024",
+              race_2_name="Manchester 2024", name_1="Ingham, James")

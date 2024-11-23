@@ -356,6 +356,8 @@ birminghamS7 = HyroxEvent(event_id="UKBOveralll", season=7, print_name="birmingh
 dublinS7 = HyroxEvent(event_id="IEDOverall", season=7, print_name="dublinNov2024")
 rotterdamS6 = HyroxEvent(event_id="JGDMS4JI747", season=6, print_name="rotterdamApr2024")
 
+manchester_2024 = HyroxEvent(event_id="JGDMS4JI8B0", season=7, print_name="Manchester 2024")
+
 if __name__ == '__main__':
-    subset = [s6_london_excel]
+    subset = [manchester_2024]
     save_events(subset)
