@@ -42,3 +42,12 @@ USER_WALL_BALLS = "user_wall_balls"
 ALL_USER_INPUTS = [USER_RUN_1, USER_RUN_2, USER_RUN_3, USER_RUN_4, USER_RUN_5, USER_RUN_6, USER_RUN_7, USER_RUN_8,
                    USER_SKI_ERG, USER_SLED_PUSH, USER_SLED_PULL, USER_BURPEE_BROAD_JUMP, USER_ROW_ERG, USER_FARMERS_CARRY, USER_SANDBAG_LUNGES, USER_WALL_BALLS]
 
+WORK_2_RUN = "work_to_run_ratio"
+ROXZONE_2_TOTAL = "roxzone_to_total_ratio"
+RUN_1_TO_8 = "run1_to_run8_ratio"
+SLED_PUSH_2_PULL = "sled_push_to_sled_pull_ratio"
+FIRST_HALF_TO_SECOND_HALF_RATIO = "first_half_to_second_half_ratio"
+AVG_RUN_PACING_CHANGE = "avg_run_pacing_change"
+STRENGTH_SCORE = "strength_score"
+ENDURANCE_SCORE = "endurance_score"
+STRENGTH_TO_ENDURANCE_BALANCE = "strength_to_endurance_balance"

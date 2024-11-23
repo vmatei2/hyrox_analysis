@@ -50,18 +50,42 @@ def calculate_performance_ratios(df):
     #  2. Roxzone Time to Total Time ratio
     df['roxzone_to_total_ratio'] = df['roxzone_time'] / df['total_time']
     #  3. Run 1 to Run 8 -- how much can people hold their pace?
-    df['run1_to_run8'] = df['run_1'] / df['run_8']
-    df['sled_oush_to_sled_pull'] = df['work_2'] / df['work_3']
-
-
-    #  3. First half to second half ratio (run and work times)
+    df['run1_to_run8_ratio'] = df['run_1'] / df['run_8']
+    df['sled_push_to_sled_pull_ratio'] = df['work_2'] / df['work_3']
+    #  4. First half to second half ratio (run and work times)
     first_half_time = df[['run_1', 'run_2', 'run_3', 'run_4', 'work_1', 'work_2', 'work_3', 'work_4']].sum(axis=1)
     second_half_time = df[['run_5', 'run_6', 'run_7', 'run_8', 'work_5', 'work_6', 'work_7', 'work_8']].sum(axis=1)
     df['first_half_to_second_half_ratio'] = first_half_time / second_half_time
+
+    #  calculate the average percentage change between runs for an athlete
+    run_columns = [f'run_{i}' for i in range(1, 9)]
+    run_changes = df[run_columns].pct_change(axis=1).abs()
+    df['avg_run_pacing_change'] = run_changes.mean(axis=1)
+
+    #  we will look at an athlete's performance on the stations in strength vs endurance - i.e. sleds / farmers carry  vs endurance lunges / burpees / wallballs / skierg / rowerg
+    work_columns = [f'work_{i}' for i in range(1, 9)]
+    for col in work_columns:
+        df[f'{col}_zscore'] = (df[col] - df[col].mean()) / df[col].std()
+    strength_stations = ['work_2', 'work_3', 'work_6']
+    endurance_stations = ['work_1', 'work_4', 'work_5', 'work_6', 'work_7', 'work_8']
+    df['strength_score'] = df[[f'{station}_zscore' for station in strength_stations]].sum(axis=1)
+    df['endurance_score'] = df[[f'{station}_zscore' for station in endurance_stations]].sum(axis=1)
+
+    # Calculate Strength-to-Endurance Balance
+    df['strength_to_endurance_balance'] = df['strength_score'] / (df['endurance_score'] + 1e-9)  # Avoid division by zero
+
+    # infs may come from data issues (i.e. run stored as 0)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+
+    # Replace inf/-inf with NaN only in numeric columns
+    df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
+
+    # Drop rows with NaN in any numeric column
+    df.dropna(subset=numeric_cols, inplace=True)
     return df
 
 
-def build_weighted_athlete_network_with_features(df, threshold=10):
+def build_athlete_network(df):
     """
     Builds a network of athletes based on similarity in performance metrics, including engineered features.
 
@@ -71,59 +95,27 @@ def build_weighted_athlete_network_with_features(df, threshold=10):
     """
 
     # Prepare data
-    metrics = df[['roxzone_time', 'total_time', 'work_2', 'work_3', 'work_4', 'work_to_run_ratio', 'roxzone_to_total_ratio',
-                  'first_half_to_second_half_ratio']].values
+    metrics = df[[_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
+                  _ct.STRENGTH_TO_ENDURANCE_BALANCE]].values
 
     # Calculate all pairwise Euclidean distances
     distances = pdist(metrics, metric='euclidean')
-    distance_matrix = squareform(distances)  # Convert to a square matrix format
+    similarity_weights = 1 - (distances - distances.min() / distances.max() - distances.min())  #  normalise the values
+    adjacency_matrix = squareform(similarity_weights)  # Convert to a square matrix format
 
     # Initialize the graph and add nodes
     G = nx.Graph()
-    for name in df['name']:
-        G.add_node(name)
-
-    #  Helper function to add edges based on the threshold distance
-    def add_edges_for_row(i):
-        edges = []
-        for j in range(i + 1, len(df)):
-            euclidean_distance = distance_matrix[i, j]
-            if euclidean_distance < threshold:
-                name_i = df['name'].iloc[i]
-                name_j = df['name'].iloc[j]
-                weight = 1 / (euclidean_distance + 1e-5)  # Use inverse distance for weight
-                edges.append((name_i, name_j, weight))
-        return edges
-
-    # Parallel processing using ThreadPoolExecutor
-    all_edges = []
-    with ThreadPoolExecutor() as executor:
-        futures = {executor.submit(add_edges_for_row, i): i for i in range(len(df))}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing athletes"):
-            all_edges.extend(future.result())
-
-    G.add_weighted_edges_from(all_edges)
+    for i, name_i in enumerate(df['name']):
+        for j, name_j in enumerate(df['name']):
+            if i < j:  # Avoid duplicates and self-loops
+                G.add_edge(name_i, name_j, weight=adjacency_matrix[i, j])
     return G
 
-s7_birmingham = load_one_file("assets/hyroxData/S7 2024 Birmingham.csv")
-bmham_filtered = get_division_entry(s7_birmingham, "male", "open")
-bmham_filtered = calculate_performance_ratios(bmham_filtered)
-network = build_weighted_athlete_network_with_features(bmham_filtered, 5)
 
-# Position nodes using the spring layout for a more spread-out look
-d = nx.degree(network)
-pos = nx.spring_layout(network, seed=42)
-degree_values = [v for k, v in d]
+dublin = load_one_file("assets/hyroxData/S7 2024 Dublin.csv")
+dublin = get_division_entry(dublin, "male", "open")
+dublin = calculate_performance_ratios(dublin)
+network = build_athlete_network(dublin)
 print('calculating communities')
-communities = list(nx.community.louvain_communities(network))
+communities = list(nx.community.louvain_communities(network, weight='weight'))
 print('finished calculating communities')
-breakhere = 0
-
-# Draw nodes and edges
-# plt.figure(figsize=(16, 16))
-# nx.draw_networkx(network, pos=nx.spring_layout(network, k=0.99), nodelist=network.nodes(), node_size=[v * 10 for v in degree_values],
-#                      with_labels=True,
-#                      node_color='lightgreen', alpha=0.6)
-# # Display the visualization
-# plt.title("Athlete Network Based on Performance Similarity")
-# plt.show()

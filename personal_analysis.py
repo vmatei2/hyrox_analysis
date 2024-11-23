@@ -33,7 +33,8 @@ def compare_races(path_df_1, path_df_2, race_1_name, race_2_name, name_1, name_2
 
 
     race_1_bars = ax.bar([i - width/2 for i in x], race_1_values, width=width, label=race_1_name)  # assigning ax.bar variables in case needed for further dynamic manipulation of the data
-    race_2_Bars = ax.bar([i + width/2 for i in x], race_2_values, width=width, label=race_2_name)  # i+width here so we slightly separate the bars visually
+    race_2_Bars = ax.bar([i + width/2 for i in x
+                          ], race_2_values, width=width, label=race_2_name)  # i+width here so we slightly separate the bars visually
 
     for i, (race1, race2, diffs) in enumerate(zip(race_1_values, race_2_values, differences)):
         # Calculate the x position for annotation (between the bars)
