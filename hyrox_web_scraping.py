@@ -9,6 +9,7 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import os
+from concurrent.futures  import ThreadPoolExecutor
 
 
 ## helper classes
@@ -185,14 +186,21 @@ class HyroxEvent:
         return arr
 
     def generate_url(self, page: int, division: Division, gender: Gender):
-        return f"https://hyrox.r.mikatiming.com/season-{self.season}/?page={page}&event={division.value}_{self.event_id}&num_results=100&pid=list&pidp=start&ranking=time_finish_netto&search%5Bsex%5D={gender.value}&search%5Bage_class%5D=%25&search%5Bnation%5D=%25"
+        return f"https://hyrox.r.mikatiming.com/season-{self.season}/?page={page}&event={division.value}_{self.event_id}&num_results=100&pid=list&pidp=ranking_nav&ranking=time_finish_netto&search%5Bsex%5D={gender.value}&search%5Bage_class%5D=%25&search%5Bnation%5D=%25"
 
     def get_info(self):
         combinations = list(itertools.product(Division, Gender))
-        pbar = tqdm(combinations, desc="Retrieving participants")
         print(f'Retrieving participants for {self.print_name}')
+        # for combination in combinations:
+        #     self.retrieve_combination(combination)
+        with tqdm(total=len(combinations), desc='Retrieving Participants') as pbar:
+            def wrapper(combination):
+                self.retrieve_combination(combination)
+                pbar.update(1)
 
-        thread_map(self.retrieve_combination, combinations, max_workers=4, desc="Retrieving Participants")
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                executor.map(wrapper,combinations)
+
         thread_map(lambda participant: participant.get_timings(), self.participants, max_workers=10,
                    desc="Retrieving Splits")
 
@@ -280,14 +288,14 @@ class HyroxEvent:
                     link=link
                 )
                 self.event_participants[division][gender].append(participant)
-
             if len(self.event_participants[division][gender]) < self.num_event_participants[division][gender]:
-                print(f'Finished page: {page}')
                 page += 1
+                print(f"Finished Fetching page: {page-1} for {division}/{gender}")
+                print(f"Len of event participants for above combination is {len(self.event_participants[division][gender])}")
             else:
                 break
 
-    def save(self, directory: str = "/kaggle/working"):
+    def save(self):
         def participant_map(p: HyroxParticipant):
             arr = [self.event_id, self.event_name]
             arr.extend(p.to_array())
@@ -343,6 +351,9 @@ newYork2024 = HyroxEvent(event_id="JGDMS4JI7E7", season=6, print_name="newYork20
 
 birminghamS7 = HyroxEvent(event_id="UKBOveralll", season=7, print_name="birminghamOct2024")
 
+dublinS7 = HyroxEvent(event_id="IEDOverall", season=7, print_name="dublinNov2024")
+
+rotterdamS6 = HyroxEvent(event_id="H_JGDMS4JI747", season=6, print_name="rotterdamApr2024")
 if __name__ == '__main__':
-    subset = [birminghamS7]
+    subset = [dublinS7]
     save_events(subset)
