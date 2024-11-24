@@ -43,6 +43,7 @@ ALL_USER_INPUTS = [USER_RUN_1, USER_RUN_2, USER_RUN_3, USER_RUN_4, USER_RUN_5, U
                    USER_SKI_ERG, USER_SLED_PUSH, USER_SLED_PULL, USER_BURPEE_BROAD_JUMP, USER_ROW_ERG, USER_FARMERS_CARRY, USER_SANDBAG_LUNGES, USER_WALL_BALLS]
 
 WORK_2_RUN = "work_to_run_ratio"
+RUN_2_TOTAL = "run_to_total"
 ROXZONE_2_TOTAL = "roxzone_to_total_ratio"
 RUN_1_TO_8 = "run1_to_run8_ratio"
 SLED_PUSH_2_PULL = "sled_push_to_sled_pull_ratio"

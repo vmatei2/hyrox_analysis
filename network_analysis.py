@@ -47,6 +47,7 @@ def calculate_performance_ratios(df):
     """
     #  1. Work/Station Time to Run Time
     df['work_to_run_ratio'] = df['work_time'] / df['run_time']
+    df[_ct.RUN_2_TOTAL] = df['run_time'] / df['total_time']
     #  2. Roxzone Time to Total Time ratio
     df['roxzone_to_total_ratio'] = df['roxzone_time'] / df['total_time']
     #  3. Run 1 to Run 8 -- how much can people hold their pace?
@@ -71,6 +72,7 @@ def calculate_performance_ratios(df):
     df['strength_score'] = df[[f'{station}_zscore' for station in strength_stations]].sum(axis=1)
     df['endurance_score'] = df[[f'{station}_zscore' for station in endurance_stations]].sum(axis=1)
 
+
     # Calculate Strength-to-Endurance Balance
     df['strength_to_endurance_balance'] = df['strength_score'] / (df['endurance_score'] + 1e-9)  # Avoid division by zero
 
@@ -85,7 +87,7 @@ def calculate_performance_ratios(df):
     return df
 
 
-def build_athlete_network(df):
+def build_athlete_network(df, similarity_threshold):
     """
     Builds a network of athletes based on similarity in performance metrics, including engineered features.
 
@@ -96,26 +98,61 @@ def build_athlete_network(df):
 
     # Prepare data
     metrics = df[[_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
-                  _ct.STRENGTH_TO_ENDURANCE_BALANCE]].values
+                  _ct.STRENGTH_TO_ENDURANCE_BALANCE, _ct.RUN_2_TOTAL]].values
 
     # Calculate all pairwise Euclidean distances
     distances = pdist(metrics, metric='euclidean')
-    similarity_weights = 1 - (distances - distances.min() / distances.max() - distances.min())  #  normalise the values
-    adjacency_matrix = squareform(similarity_weights)  # Convert to a square matrix format
+    #  Step 1. Normalised the distances between 0 and 1 - Step 2. Subtract 1, so a higher value will mean a higher similarity score (i.e. 0.1 distance - 1-0.1 = 0.9 --> high similarity)
+    adjacency_matrix = squareform(distances)
+    #  similarity_weights = 1 - (distances - distances.min()) / (distances.max() - distances.min())  #  normalise the values
+    # adjacency_matrix = squareform(similarity_weights)  # Convert to a square matrix format
 
     # Initialize the graph and add nodes
     G = nx.Graph()
     for i, name_i in enumerate(df['name']):
         for j, name_j in enumerate(df['name']):
             if i < j:  # Avoid duplicates and self-loops
-                G.add_edge(name_i, name_j, weight=adjacency_matrix[i, j])
+                weight = adjacency_matrix[i, j]  # extrac the similarity value between the two athletes
+                if weight < similarity_threshold:
+                    G.add_edge(name_i, name_j, weight=adjacency_matrix[i, j])
     return G
 
+def extract_community_dataframes(df, communities):
+    """
+    Retrusn a list of dataframes, each corresponding to a community
+    :param df: the datframe of athletes
+    :param commuities: communities generated using network analysis
+    :return:
+    """
+    return [df[df['name'].isin(community)].copy() for community in communities]
+
+def profile_communities(community_dfs):
+    """
+    Function for profiling the communities returned by the algorithms
+    :param community_dfs:
+    :return:
+    """
+    for i, community_df in enumerate(community_dfs):
+        print(f"Analysing community {i}")
+        print(f"Number of athletes in community: {len(community_df)}")
+        print(f"Fastest Time: {community_df['total_time'].min()}")
+        print(f"Slowest Time: {community_df['total_time'].max()}")
+
+        for column in [_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
+                       _ct.STRENGTH_TO_ENDURANCE_BALANCE]:
+            mean_value = community_df[column].mean()
+            std_dev_value = community_df[column].std()
+            max_value = community_df[column].max()
+            min_value = community_df[column].min()
+            print(f"{column}: Mean = {mean_value:.2f}, Std dev = {std_dev_value:.2f} Max = {max_value:.2f} Min = {min_value:.2f}")
+        print('\n\n')
 
 dublin = load_one_file("assets/hyroxData/S7 2024 Dublin.csv")
 dublin = get_division_entry(dublin, "male", "open")
 dublin = calculate_performance_ratios(dublin)
-network = build_athlete_network(dublin)
+network = build_athlete_network(dublin, 0.15)
 print('calculating communities')
-communities = list(nx.community.louvain_communities(network, weight='weight'))
+communities = list(nx.community.louvain_communities(network, weight='weight', resolution=0.4))
+community_dfs = extract_community_dataframes(dublin, communities)
+profile_communities(community_dfs)
 print('finished calculating communities')
