@@ -1,3 +1,5 @@
+import pandas as pd
+
 from hyrox_results_analysis import load_one_file, extract_mean_values_runs_stations, get_division_entry, \
     plot_data_points, line_plot_runs
 import constants as _ct
@@ -11,6 +13,8 @@ from scipy.spatial.distance import euclidean, pdist, squareform
 import network_helpers as net_help
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 def select_user(df, name):
     """
@@ -132,12 +136,14 @@ def profile_communities(community_dfs):
     :param community_dfs:
     :return:
     """
-    for i, community_df in enumerate(community_dfs):
-        print(f"Analysing community {i}")
-        print(f"Number of athletes in community: {len(community_df)}")
-        print(f"Fastest Time: {community_df['total_time'].min()}")
-        print(f"Slowest Time: {community_df['total_time'].max()}")
 
+    profiling_data = []
+
+    for i, community_df in enumerate(community_dfs):
+        community_name = f"Community {i + 1}"
+        num_athletes = len(community_df)
+        fastest_time = community_df['total_time'].min()
+        slowest_time = community_df['total_time'].max()
         for column in [_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
                        _ct.STRENGTH_TO_ENDURANCE_BALANCE]:
             mean_value = community_df[column].mean()
@@ -145,7 +151,71 @@ def profile_communities(community_dfs):
             max_value = community_df[column].max()
             min_value = community_df[column].min()
             print(f"{column}: Mean = {mean_value:.2f}, Std dev = {std_dev_value:.2f} Max = {max_value:.2f} Min = {min_value:.2f}")
-        print('\n\n')
+            profiling_data.append(({
+                "Community": community_name,
+                "Number of Athletes": num_athletes,
+                "Fastest Time": fastest_time,
+                "Slowest Time": slowest_time,
+                "Metric": column,
+                "Mean": mean_value,
+                "Max": max_value,
+                "Min": min_value
+            }))
+
+    profiling_df = pd.DataFrame(profiling_data)
+    profiling_df.to_csv("assets/reports/report.csv")
+
+def plot_communities(communities):
+    num_communities = 0
+
+    # collect data for plotting
+    lap_avg_run_times = []
+    avg_stations_times = []
+    avg_total_times = []
+
+    for i, community_df in enumerate(communities):
+        if len(community_df) > 10:
+            num_communities += 1
+            lap_avg_run_time = community_df[[f'run_{i+1}' for i in range(8)]].mean()
+            station_avg_times = community_df[[f'work_{i+1}' for i in range(8)]].mean()
+            avg_total_time = community_df['total_time'].mean()
+
+            lap_avg_run_times.append(lap_avg_run_time)
+            avg_stations_times.append(station_avg_times)
+            avg_total_times.append(avg_total_time)
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+    # Plot average lap run times
+    for idx, avg_times in enumerate(lap_avg_run_times):
+        axes[0].plot(range(1, 9), avg_times, marker='o', label=f'Community {idx+1}')
+    axes[0].set_title('Average Run Time Per Lap')
+    axes[0].set_xlabel('Lap Number')
+    axes[0].set_ylabel('Average Time (s)')
+    axes[0].legend()
+    axes[0].grid(True)
+
+    # Plot average station times
+    for idx, avg_times in enumerate(avg_stations_times):
+        axes[1].plot(range(1, 9), avg_times, marker='s', label=f'Community {idx+1}')
+    axes[1].set_title('Average Station Time Per Station')
+    axes[1].set_xlabel('Station Number')
+    axes[1].set_ylabel('Average Time (s)')
+    axes[1].legend()
+    axes[1].grid(True)
+
+    # Plot average total finish times
+    axes[2].bar(range(1, num_communities + 1), avg_total_times, color='skyblue')
+    axes[2].set_title('Average Total Finish Time')
+    axes[2].set_xlabel('Community')
+    axes[2].set_ylabel('Average Total Time (s)')
+    axes[2].set_xticks(range(1, num_communities + 1))
+    axes[2].grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Adjust layout
+    plt.tight_layout()
+    plt.show()
+
 
 dublin = load_one_file("assets/hyroxData/S7 2024 Dublin.csv")
 dublin = get_division_entry(dublin, "male", "open")
@@ -155,4 +225,6 @@ print('calculating communities')
 communities = list(nx.community.louvain_communities(network, weight='weight', resolution=0.4))
 community_dfs = extract_community_dataframes(dublin, communities)
 profile_communities(community_dfs)
+
+plot_communities(community_dfs)
 print('finished calculating communities')
