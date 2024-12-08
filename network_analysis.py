@@ -1,5 +1,5 @@
 import pandas as pd
-
+import os
 from hyrox_results_analysis import load_one_file, extract_mean_values_runs_stations, get_division_entry, \
     plot_data_points, line_plot_runs
 import constants as _ct
@@ -15,6 +15,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import pickle
+
+
+sns.set_style('darkgrid')
 
 def select_user(df, name):
     """
@@ -61,7 +66,9 @@ def calculate_performance_ratios(df):
     first_half_time = df[['run_1', 'run_2', 'run_3', 'run_4', 'work_1', 'work_2', 'work_3', 'work_4']].sum(axis=1)
     second_half_time = df[['run_5', 'run_6', 'run_7', 'run_8', 'work_5', 'work_6', 'work_7', 'work_8']].sum(axis=1)
     df['first_half_to_second_half_ratio'] = first_half_time / second_half_time
-
+    df[_ct.SLEDPULL_2_BURPEE] = df['work_3'] / df['work_4']
+    df[_ct.SKI_ERG_TO_ROW_ERG] = df['work_1'] / df['work_5']
+    df[_ct.SKI_ERG_TO_WALL_BALL] = df['work_1'] / df['work_8']
     #  calculate the average percentage change between runs for an athlete
     run_columns = [f'run_{i}' for i in range(1, 9)]
     run_changes = df[run_columns].pct_change(axis=1).abs()
@@ -71,14 +78,14 @@ def calculate_performance_ratios(df):
     work_columns = [f'work_{i}' for i in range(1, 9)]
     for col in work_columns:
         df[f'{col}_zscore'] = (df[col] - df[col].mean()) / df[col].std()
-    strength_stations = ['work_2', 'work_3', 'work_6']
-    endurance_stations = ['work_1', 'work_4', 'work_5', 'work_6', 'work_7', 'work_8']
+    strength_stations = ['work_2', 'work_3', 'work_6', 'work_8']
+    endurance_stations = ['work_1', 'work_4', 'work_5', 'work_7']
     df['strength_score'] = df[[f'{station}_zscore' for station in strength_stations]].sum(axis=1)
     df['endurance_score'] = df[[f'{station}_zscore' for station in endurance_stations]].sum(axis=1)
 
-
     # Calculate Strength-to-Endurance Balance
-    df['strength_to_endurance_balance'] = df['strength_score'] / (df['endurance_score'] + 1e-9)  # Avoid division by zero
+    df['strength_to_endurance_balance'] = df['strength_score'] / (
+            df['endurance_score'] + 1e-9)  # Avoid division by zero
 
     # infs may come from data issues (i.e. run stored as 0)
     numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -101,8 +108,7 @@ def build_athlete_network(df, similarity_threshold):
     """
 
     # Prepare data
-    metrics = df[[_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
-                  _ct.STRENGTH_TO_ENDURANCE_BALANCE, _ct.RUN_2_TOTAL]].values
+    metrics = df[_ct.NETWORK_ANALYSIS_METRICS].values
 
     # Calculate all pairwise Euclidean distances
     distances = pdist(metrics, metric='euclidean')
@@ -121,6 +127,7 @@ def build_athlete_network(df, similarity_threshold):
                     G.add_edge(name_i, name_j, weight=adjacency_matrix[i, j])
     return G
 
+
 def extract_community_dataframes(df, communities):
     """
     Retrusn a list of dataframes, each corresponding to a community
@@ -129,6 +136,7 @@ def extract_community_dataframes(df, communities):
     :return:
     """
     return [df[df['name'].isin(community)].copy() for community in communities]
+
 
 def profile_communities(community_dfs):
     """
@@ -144,13 +152,13 @@ def profile_communities(community_dfs):
         num_athletes = len(community_df)
         fastest_time = community_df['total_time'].min()
         slowest_time = community_df['total_time'].max()
-        for column in [_ct.WORK_2_RUN, _ct.ROXZONE_2_TOTAL, _ct.RUN_1_TO_8, _ct.SLED_PUSH_2_PULL, _ct.FIRST_HALF_TO_SECOND_HALF_RATIO, _ct.AVG_RUN_PACING_CHANGE,
-                       _ct.STRENGTH_TO_ENDURANCE_BALANCE]:
+        for column in _ct.NETWORK_ANALYSIS_METRICS:
             mean_value = community_df[column].mean()
             std_dev_value = community_df[column].std()
             max_value = community_df[column].max()
             min_value = community_df[column].min()
-            print(f"{column}: Mean = {mean_value:.2f}, Std dev = {std_dev_value:.2f} Max = {max_value:.2f} Min = {min_value:.2f}")
+            print(
+                f"{column}: Mean = {mean_value:.2f}, Std dev = {std_dev_value:.2f} Max = {max_value:.2f} Min = {min_value:.2f}")
             profiling_data.append(({
                 "Community": community_name,
                 "Number of Athletes": num_athletes,
@@ -165,6 +173,7 @@ def profile_communities(community_dfs):
     profiling_df = pd.DataFrame(profiling_data)
     profiling_df.to_csv("assets/reports/report.csv")
 
+
 def plot_communities(communities):
     num_communities = 0
 
@@ -172,59 +181,145 @@ def plot_communities(communities):
     lap_avg_run_times = []
     avg_stations_times = []
     avg_total_times = []
+    individual_run_times = []
+    individual_station_times = []
+    individual_total_times = []
+    number_of_athletes_in_community = []
+    metrics_data = []
 
     for i, community_df in enumerate(communities):
-        if len(community_df) > 10:
-            num_communities += 1
-            lap_avg_run_time = community_df[[f'run_{i+1}' for i in range(8)]].mean()
-            station_avg_times = community_df[[f'work_{i+1}' for i in range(8)]].mean()
+
+            lap_avg_run_time = community_df[[f'run_{i + 1}' for i in range(8)]].mean()
+            station_avg_times = community_df[[f'work_{i + 1}' for i in range(8)]].mean()
             avg_total_time = community_df['total_time'].mean()
 
-            lap_avg_run_times.append(lap_avg_run_time)
-            avg_stations_times.append(station_avg_times)
-            avg_total_times.append(avg_total_time)
+            if len(community_df) > 50:
+                num_communities += 1
+                lap_avg_run_times.append(lap_avg_run_time)
+                avg_stations_times.append(station_avg_times)
+                avg_total_times.append(avg_total_time)
+                metrics_avg = community_df[_ct.NETWORK_ANALYSIS_METRICS].mean().values
+                metrics_data.append(metrics_avg)
+                # select a random athlete from the community and check their run and station times
+                # random_athlete = community_df.sample(n=2, random_state=10).iloc[0]
+                community_athlete = community_df.iloc[0]
+                individual_run_times.append(community_athlete[[f'run_{i+1}' for i in range(8)]])
+                individual_station_times.append(community_athlete[[f'work_{i+1}' for i in range(8)]])
+                individual_total_times.append(community_athlete['total_time'])
+                number_of_athletes_in_community.append(len(community_df))
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    num_communities = len(lap_avg_run_times)
+    fig, axes = plt.subplots(3, 3, figsize=(18, 12))
 
-    # Plot average lap run times
-    for idx, avg_times in enumerate(lap_avg_run_times):
-        axes[0].plot(range(1, 9), avg_times, marker='o', label=f'Community {idx+1}')
-    axes[0].set_title('Average Run Time Per Lap')
-    axes[0].set_xlabel('Lap Number')
-    axes[0].set_ylabel('Average Time (s)')
-    axes[0].legend()
-    axes[0].grid(True)
+    # Plot average run and station times for each community
+    for idx in range(num_communities):
+        # Top row: Community average run times
+        axes[0, 0].plot(range(1, 9), lap_avg_run_times[idx], marker='o', label=f'Community {idx + 1}')
+        axes[0, 0].set_title('Average Run Time Per Lap')
+        axes[0, 0].set_xlabel('Lap Number')
+        axes[0, 0].set_ylabel('Average Time (s)')
+        axes[0, 0].legend()
+        axes[0, 0].grid(True)
 
-    # Plot average station times
-    for idx, avg_times in enumerate(avg_stations_times):
-        axes[1].plot(range(1, 9), avg_times, marker='s', label=f'Community {idx+1}')
-    axes[1].set_title('Average Station Time Per Station')
-    axes[1].set_xlabel('Station Number')
-    axes[1].set_ylabel('Average Time (s)')
-    axes[1].legend()
-    axes[1].grid(True)
+        # Top row: Community average station times
+        axes[0, 1].plot(range(1, 9), avg_stations_times[idx], marker='s', label=f'Community {idx + 1}')
+        axes[0, 1].set_title('Average Station Time Per Station')
+        axes[0, 1].set_xlabel('Station Number')
+        axes[0, 1].set_ylabel('Average Time (s)')
+        axes[0, 1].legend()
+        axes[0, 1].grid(True)
 
-    # Plot average total finish times
-    axes[2].bar(range(1, num_communities + 1), avg_total_times, color='skyblue')
-    axes[2].set_title('Average Total Finish Time')
-    axes[2].set_xlabel('Community')
-    axes[2].set_ylabel('Average Total Time (s)')
-    axes[2].set_xticks(range(1, num_communities + 1))
-    axes[2].grid(axis='y', linestyle='--', alpha=0.7)
+        # Top row: Community average total finish times
+        bars = axes[0, 2].bar(idx + 1, avg_total_times[idx], color='skyblue')
+        axes[0, 2].set_title('Average Total Finish Time')
+        axes[0, 2].set_xlabel('Community')
+        axes[0, 2].set_ylabel('Average Total Time (s)')
+        axes[0, 2].set_xticks(range(1, num_communities + 1))
+        axes[0, 2].grid(axis='y', linestyle='--', alpha=0.7)
+        axes[0, 2].bar_label(bars, fmt='%.2f', padding=3)
 
+    # Plot individual athlete's run times
+    for idx in range(num_communities):
+        axes[1, 0].plot(range(1, 9), individual_run_times[idx], marker='o', label=f'Athlete {idx + 1}')
+    axes[1, 0].set_title('Individual Athlete Run Times')
+    axes[1, 0].set_xlabel('Lap Number')
+    axes[1, 0].set_ylabel('Time (s)')
+    axes[1, 0].legend()
+    axes[1, 0].grid(True)
+
+    # Plot individual athlete's station times
+    for idx in range(num_communities):
+        axes[1, 1].plot(range(1, 9), individual_station_times[idx], marker='s', label=f'Athlete {idx + 1}')
+    axes[1, 1].set_title('Individual Athlete Station Times')
+    axes[1, 1].set_xlabel('Station Number')
+    axes[1, 1].set_ylabel('Time (s)')
+    axes[1, 1].legend()
+    axes[1, 1].grid(True)
+
+    # Plot individual athlete's total finish times
+    bars = axes[1, 2].bar(range(1, num_communities + 1), individual_total_times, color='lightcoral')
+    axes[1, 2].set_title('Individual Athlete Total Finish Time')
+    axes[1, 2].set_xlabel('Athlete')
+    axes[1, 2].set_ylabel('Total Time (s)')
+    axes[1, 2].set_xticks(range(1, num_communities + 1))
+    axes[1, 2].grid(axis='y', linestyle='--', alpha=0.7)
+    axes[1, 2].bar_label(bars, fmt='%.2f', padding=3)
+
+    # Plot number of athletes in each community
+    size_bars = axes[2, 0].bar(range(1, num_communities + 1), number_of_athletes_in_community, color='lightgreen')
+    axes[2, 0].set_title('Number of Athletes in Each Community')
+    axes[2, 0].set_xlabel('Community')
+    axes[2, 0].set_ylabel('Number of Athletes')
+    axes[2, 0].set_xticks(range(1, num_communities + 1))
+    axes[2, 0].grid(axis='y', linestyle='--', alpha=0.7)
+    axes[2, 0].bar_label(size_bars, fmt='%d', padding=3)
+
+    # Plot stacked bar chart of network metrics used in community detection
+    # Plot grouped bar chart for community metrics
+    bar_width = 0.15
+    x = np.arange(len(_ct.NETWORK_ANALYSIS_METRICS))  # the label locations
+    colors = plt.cm.tab20.colors  # Use a colormap with enough distinct colors
+
+    for idx in range(num_communities):
+        offset = bar_width * idx
+        axes[2, 1].bar(x + offset, metrics_data[idx], bar_width, label=f'Community {idx + 1}', color=colors[idx % len(colors)])
+
+    axes[2, 1].set_title('Community Metrics')
+    axes[2, 1].set_xlabel('Metrics')
+    axes[2, 1].set_ylabel('Average Value')
+    axes[2, 1].set_xticks(x + bar_width * (num_communities - 1) / 2)
+    axes[2, 1].set_xticklabels(_ct.NETWORK_ANALYSIS_METRICS, rotation=45, ha='right')
+    axes[2, 1].legend()
+    axes[2, 1].grid(True)
+
+    axes[2, 0].axis('off')
+    axes[2, 2].axis('off')
     # Adjust layout
     plt.tight_layout()
     plt.show()
 
 
-dublin = load_one_file("assets/hyroxData/S7 2024 Dublin.csv")
-dublin = get_division_entry(dublin, "male", "open")
-dublin = calculate_performance_ratios(dublin)
-network = build_athlete_network(dublin, 0.15)
-print('calculating communities')
-communities = list(nx.community.louvain_communities(network, weight='weight', resolution=0.4))
-community_dfs = extract_community_dataframes(dublin, communities)
-profile_communities(community_dfs)
+def main_network_analysis(hyrox_list_file_path):
+    dublin = load_one_file("assets/hyroxData/S7 2024 Manchester.csv")
+    dublin = get_division_entry(dublin, "male", "open")
+    dublin = calculate_performance_ratios(dublin)
+    network = build_athlete_network(dublin, 0.18)
+    print('calculating communities')
+    communities = list(nx.community.louvain_communities(network, weight='weight', seed=20, resolution=0.6))
+    community_dfs = extract_community_dataframes(dublin, communities)
+    profile_communities(community_dfs)
+    with open(hyrox_list_file_path, 'wb') as file:
+        pickle.dump(community_dfs, file)
+    plot_communities(community_dfs)
+    print('finished calculating communities')
 
-plot_communities(community_dfs)
-print('finished calculating communities')
+
+file_path = 'assets/hyroxData/community_dfs.pkl'
+if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+    with open(file_path, 'rb') as file:
+        list_of_dfs = pickle.load(file)
+        plot_communities(list_of_dfs)
+else:
+    print('The file is empty.')
+    main_network_analysis(hyrox_list_file_path=file_path)
+
