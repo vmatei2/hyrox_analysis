@@ -3,21 +3,16 @@ import os
 from hyrox_results_analysis import load_one_file, extract_mean_values_runs_stations, get_division_entry, \
     plot_data_points, line_plot_runs
 import constants as _ct
-import matplotlib.pyplot as plt
 import networkx as nx
 import seaborn as sns
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import euclidean, pdist, squareform
-import network_helpers as net_help
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 import pickle
-
+import random
+from network_helpers import nx2gt
+import graph_tool.all as gt
+from matplotlib import cm
 
 sns.set_style('darkgrid')
 
@@ -112,17 +107,14 @@ def build_athlete_network(df, similarity_threshold):
 
     # Calculate all pairwise Euclidean distances
     distances = pdist(metrics, metric='euclidean')
-    #  Step 1. Normalised the distances between 0 and 1 - Step 2. Subtract 1, so a higher value will mean a higher similarity score (i.e. 0.1 distance - 1-0.1 = 0.9 --> high similarity)
     adjacency_matrix = squareform(distances)
-    #  similarity_weights = 1 - (distances - distances.min()) / (distances.max() - distances.min())  #  normalise the values
-    # adjacency_matrix = squareform(similarity_weights)  # Convert to a square matrix format
 
     # Initialize the graph and add nodes
     G = nx.Graph()
     for i, name_i in enumerate(df['name']):
         for j, name_j in enumerate(df['name']):
-            if i < j:  # Avoid duplicates and self-loops
-                weight = adjacency_matrix[i, j]  # extrac the similarity value between the two athletes
+            if i < j:
+                weight = adjacency_matrix[i, j]  # extract the similarity value between the two athletes
                 if weight < similarity_threshold:
                     G.add_edge(name_i, name_j, weight=adjacency_matrix[i, j])
     return G
@@ -138,15 +130,79 @@ def extract_community_dataframes(df, communities):
     return [df[df['name'].isin(community)].copy() for community in communities]
 
 
+def plot_communities_large(network, communities, node_sample_size=2201, edge_alpha=0.5, seed=42):
+    """
+    Visualizes the network with nodes colored by their community membership, optimized for large graphs.
+
+    Parameters:
+        network (nx.Graph): The input graph.
+        communities (list of sets): List of sets where each set contains nodes in a community.
+        node_sample_size (int): Number of nodes to sample for visualization. Default is 500.
+        edge_alpha (float): Transparency level for edges. Default is 0.1.
+        seed (int): Random seed for layout reproducibility. Default is 42.
+
+    Returns:
+        None
+    """
+    # If sampling, reduce the graph to a subset of nodes
+    if len(network.nodes) > node_sample_size:
+        sampled_nodes = set(random.sample(list(network.nodes), node_sample_size)) # Take a random set of `node_sample_size` nodes
+        network = network.subgraph(sampled_nodes).copy()
+        #  convert the networkx graph object to graph-tool object for enhanced plotting
+        #  filter the communities as well after sampling nodes!
+        updated_communities = [
+            {node for node in community if node in sampled_nodes} for community in communities
+        ]
+        #  remove any empty communities after sampling
+        updated_communities = [community for community in updated_communities if len(community)>0]
+    else:
+        #if not sampling, then simply assign updated communities to be used afterwards
+        updated_communities = communities
+    gt_graph = nx2gt(network)
+    # creating a property map for community-based coloring
+    community_property = gt_graph.new_vertex_property("int")
+    label_to_vertex = {(gt_graph.vp['name'][v]): v for v in gt_graph.vertices()}
+
+
+    for community_id, community in enumerate(updated_communities):
+        for node in community:
+            community_property[label_to_vertex[node]] = community_id
+
+    # Convert community IDs to colors (e.g., RGBA values)
+    num_communities = len(set(community_property.a))  # Number of unique communities
+    colormap = cm.get_cmap("tab10", num_communities)  # Use a colormap with enough colors
+
+    color_property = gt_graph.new_vertex_property("vector<float>")
+    for v in gt_graph.vertices():
+        community_id = community_property[v]
+        color_property[v] = list(colormap(community_id)[:3])  # Extract RGB from colormap
+
+    #  generate a layout for the graph
+    pos = gt.sfdp_layout(gt_graph)
+
+    # create a vertex property map for node sizes
+    degree_property = gt_graph.new_vertex_property("float")
+
+    # assign sizes proportional to the degree of each vertex
+    for v in gt_graph.vertices():
+        degree_property[v] = gt_graph.vertex(v).out_degree() * 1.3  # scale factor
+
+    gt.graph_draw(gt_graph,
+                  pos=pos,
+                  vertex_fill_color=color_property,
+                  C=3.0,
+                  output_size=(800, 800)
+                  )
+
+
+
 def profile_communities(community_dfs):
     """
     Function for profiling the communities returned by the algorithms
     :param community_dfs:
     :return:
     """
-
     profiling_data = []
-
     for i, community_df in enumerate(community_dfs):
         community_name = f"Community {i + 1}"
         num_athletes = len(community_df)
@@ -174,7 +230,7 @@ def profile_communities(community_dfs):
     profiling_df.to_csv("assets/reports/report.csv")
 
 
-def plot_communities(communities):
+def plot_communities_insights(communities):
     num_communities = 0
 
     # collect data for plotting
@@ -189,19 +245,18 @@ def plot_communities(communities):
 
     for i, community_df in enumerate(communities):
 
-            lap_avg_run_time = community_df[[f'run_{i + 1}' for i in range(8)]].mean()
-            station_avg_times = community_df[[f'work_{i + 1}' for i in range(8)]].mean()
-            avg_total_time = community_df['total_time'].mean()
+            lap_avg_run_time = community_df[[f'run_{i + 1}' for i in range(8)]].median()
+            station_avg_times = community_df[[f'work_{i + 1}' for i in range(8)]].median()
+            avg_total_time = community_df['total_time'].median()
 
             if len(community_df) > 50:
                 num_communities += 1
                 lap_avg_run_times.append(lap_avg_run_time)
                 avg_stations_times.append(station_avg_times)
                 avg_total_times.append(avg_total_time)
-                metrics_avg = community_df[_ct.NETWORK_ANALYSIS_METRICS].mean().values
+                metrics_avg = community_df[_ct.NETWORK_ANALYSIS_METRICS].median().values
                 metrics_data.append(metrics_avg)
-                # select a random athlete from the community and check their run and station times
-                # random_athlete = community_df.sample(n=2, random_state=10).iloc[0]
+                #  getting the fastest athlete in the community to check their performance values
                 community_athlete = community_df.iloc[0]
                 individual_run_times.append(community_athlete[[f'run_{i+1}' for i in range(8)]])
                 individual_station_times.append(community_athlete[[f'work_{i+1}' for i in range(8)]])
@@ -209,31 +264,31 @@ def plot_communities(communities):
                 number_of_athletes_in_community.append(len(community_df))
 
     num_communities = len(lap_avg_run_times)
-    fig, axes = plt.subplots(3, 3, figsize=(18, 12))
+    fig, axes = plt.subplots(3, 3, figsize=(18, 18))
 
-    # Plot average run and station times for each community
+    # Plot Median run and station times for each community
     for idx in range(num_communities):
-        # Top row: Community average run times
+        # Top row: Community Median run times
         axes[0, 0].plot(range(1, 9), lap_avg_run_times[idx], marker='o', label=f'Community {idx + 1}')
-        axes[0, 0].set_title('Average Run Time Per Lap')
+        axes[0, 0].set_title('Median Run Time Per Lap')
         axes[0, 0].set_xlabel('Lap Number')
-        axes[0, 0].set_ylabel('Average Time (s)')
+        axes[0, 0].set_ylabel('Median Time (s)')
         axes[0, 0].legend()
         axes[0, 0].grid(True)
 
-        # Top row: Community average station times
+        # Top row: Community Median station times
         axes[0, 1].plot(range(1, 9), avg_stations_times[idx], marker='s', label=f'Community {idx + 1}')
-        axes[0, 1].set_title('Average Station Time Per Station')
+        axes[0, 1].set_title('Median Station Time Per Station')
         axes[0, 1].set_xlabel('Station Number')
-        axes[0, 1].set_ylabel('Average Time (s)')
+        axes[0, 1].set_ylabel('Median Time (s)')
         axes[0, 1].legend()
         axes[0, 1].grid(True)
 
-        # Top row: Community average total finish times
+        # Top row: Community median total finish times
         bars = axes[0, 2].bar(idx + 1, avg_total_times[idx], color='skyblue')
-        axes[0, 2].set_title('Average Total Finish Time')
+        axes[0, 2].set_title('Median Total Finish Time')
         axes[0, 2].set_xlabel('Community')
-        axes[0, 2].set_ylabel('Average Total Time (s)')
+        axes[0, 2].set_ylabel('Median Total Time (s)')
         axes[0, 2].set_xticks(range(1, num_communities + 1))
         axes[0, 2].grid(axis='y', linestyle='--', alpha=0.7)
         axes[0, 2].bar_label(bars, fmt='%.2f', padding=3)
@@ -286,7 +341,7 @@ def plot_communities(communities):
 
     axes[2, 1].set_title('Community Metrics')
     axes[2, 1].set_xlabel('Metrics')
-    axes[2, 1].set_ylabel('Average Value')
+    axes[2, 1].set_ylabel('Median Value')
     axes[2, 1].set_xticks(x + bar_width * (num_communities - 1) / 2)
     axes[2, 1].set_xticklabels(_ct.NETWORK_ANALYSIS_METRICS, rotation=45, ha='right')
     axes[2, 1].legend()
@@ -296,6 +351,7 @@ def plot_communities(communities):
     axes[2, 2].axis('off')
     # Adjust layout
     plt.tight_layout()
+    plt.savefig("community_insights.jpeg")
     plt.show()
 
 
@@ -310,16 +366,21 @@ def main_network_analysis(hyrox_list_file_path):
     profile_communities(community_dfs)
     with open(hyrox_list_file_path, 'wb') as file:
         pickle.dump(community_dfs, file)
-    plot_communities(community_dfs)
+    print("plotting community insights")
+    plot_communities_insights(community_dfs)
+    print("plotting the communities")
+    plot_communities_large(network, communities)
     print('finished calculating communities')
 
 
 file_path = 'assets/hyroxData/community_dfs.pkl'
-if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-    with open(file_path, 'rb') as file:
-        list_of_dfs = pickle.load(file)
-        plot_communities(list_of_dfs)
-else:
-    print('The file is empty.')
-    main_network_analysis(hyrox_list_file_path=file_path)
+main_network_analysis(file_path)
+
+# if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+#     with open(file_path, 'rb') as file:
+#         list_of_dfs = pickle.load(file)
+#         plot_communities(list_of_dfs)
+# else:
+#     print('The file is empty.')
+#     main_network_analysis(hyrox_list_file_path=file_path)
 
