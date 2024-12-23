@@ -70,6 +70,17 @@ def get_division_entry(df, gender, division):
 
 
 def get_filtered_df(df, column, value, lower_then=True):
+    """
+    Filter df on specific column
+    Example usage:
+    dublin = get_filtered_df(dublin, "total_time", 70)
+    Add example usage:
+    :param df:
+    :param column:
+    :param value:
+    :param lower_then:
+    :return:
+    """
     df = df.loc[df[column] < value] if lower_then else df.loc[df[column] > value]
     subset_df = df.sort_values(by='total_time', ascending=True)
     return subset_df

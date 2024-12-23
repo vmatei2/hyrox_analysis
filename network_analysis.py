@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from hyrox_results_analysis import load_one_file, extract_mean_values_runs_stations, get_division_entry, \
-    plot_data_points, line_plot_runs
+    plot_data_points, line_plot_runs, get_filtered_df
 import constants as _ct
 import networkx as nx
 import seaborn as sns
@@ -249,7 +249,7 @@ def plot_communities_insights(communities):
             station_avg_times = community_df[[f'work_{i + 1}' for i in range(8)]].median()
             avg_total_time = community_df['total_time'].median()
 
-            if len(community_df) > 50:
+            if len(community_df) > 4:
                 num_communities += 1
                 lap_avg_run_times.append(lap_avg_run_time)
                 avg_stations_times.append(station_avg_times)
@@ -359,6 +359,7 @@ def main_network_analysis(hyrox_list_file_path):
     dublin = load_one_file("assets/hyroxData/S7 2024 Manchester.csv")
     dublin = get_division_entry(dublin, "male", "open")
     dublin = calculate_performance_ratios(dublin)
+    dublin = get_filtered_df(dublin, "total_time", 70)
     network = build_athlete_network(dublin, 0.18)
     print('calculating communities')
     communities = list(nx.community.louvain_communities(network, weight='weight', seed=20, resolution=0.6))
